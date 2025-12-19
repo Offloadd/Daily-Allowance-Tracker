@@ -770,6 +770,55 @@
             updateDisplay();
         }
         
+        function startEditProposed(id) {
+            const item = data.proposed.find(i => i.id === id);
+            if (!item) return;
+            
+            // Set edit mode
+            if (!window.editingProposed) window.editingProposed = {};
+            window.editingProposed[id] = {
+                originalAmount: item.amount,
+                editing: true
+            };
+            
+            updateDisplay();
+        }
+        
+        function cancelEditProposed(id) {
+            if (window.editingProposed && window.editingProposed[id]) {
+                delete window.editingProposed[id];
+            }
+            updateDisplay();
+        }
+        
+        async function saveEditProposed(id, firestoreId) {
+            const inputElement = document.getElementById(`editAmount_${id}`);
+            const newAmount = parseFloat(inputElement.value);
+            
+            if (!newAmount || newAmount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            // Find and update the item
+            const item = data.proposed.find(i => i.id === id);
+            if (!item) return;
+            
+            item.amount = newAmount;
+            
+            // Update in Firestore
+            await updateProposedInFirestore(firestoreId, item);
+            
+            addDebugMessage(`Updated "${item.name}" to $${newAmount.toFixed(2)}`);
+            
+            // Clear edit mode
+            if (window.editingProposed && window.editingProposed[id]) {
+                delete window.editingProposed[id];
+            }
+            
+            updateDisplay();
+        }
+        
         function updateDisplay() {
             const accumulated = calculateAccumulated();
             const spent = calculateTotalSpent();
@@ -806,6 +855,7 @@
                 if (canAfford) runningBalance -= item.amount;
                 const checked = item.checked || false;
                 const strikethrough = checked ? 'text-decoration: line-through; opacity: 0.6;' : '';
+                const isEditing = window.editingProposed && window.editingProposed[item.id];
                 
                 return `
                     <li class="item proposed-item ${canAfford ? 'can-afford' : 'cannot-afford'}">
@@ -818,7 +868,14 @@
                                 ${canAfford ? '✓ Can Afford' : '✗ Cannot Afford'}
                             </span>
                         </div>
-                        <span class="item-amount" style="${strikethrough}">$${item.amount.toFixed(2)}</span>
+                        ${isEditing ? `
+                            <input type="number" id="editAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="width: 80px; padding: 5px; border: 2px solid #667eea; border-radius: 5px; margin-right: 10px; font-size: 1em;">
+                            <button onclick="saveEditProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 5px; font-size: 0.85em; cursor: pointer;">Save</button>
+                            <button onclick="cancelEditProposed(${item.id})" style="background: #6b7280; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 5px; font-size: 0.85em; cursor: pointer;">Cancel</button>
+                        ` : `
+                            <span class="item-amount" style="${strikethrough}">$${item.amount.toFixed(2)}</span>
+                            <button onclick="startEditProposed(${item.id})" style="background: #667eea; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 5px; font-size: 0.85em; cursor: pointer;">Edit</button>
+                        `}
                         <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')">Delete</button>
                     </li>
                 `;
