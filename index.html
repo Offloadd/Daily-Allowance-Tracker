@@ -331,6 +331,12 @@
             <button class="logout-btn" onclick="signOut()">Logout</button>
         </div>
         
+        <!-- Debug Status Bar -->
+        <div id="debugStatus" style="background: #f3f4f6; border: 2px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 0.9em; font-family: monospace;">
+            <div style="font-weight: bold; margin-bottom: 5px; color: #667eea;">🔍 Debug Status:</div>
+            <div id="debugMessages" style="color: #374151;">Initializing...</div>
+        </div>
+        
         <h1>💰 Daily Allowance Tracker</h1>
         
         <!-- Balance Overview -->
@@ -451,6 +457,8 @@
                 document.getElementById('app').style.display = 'block';
                 window.currentUser = user;
                 
+                addDebugMessage('Logged in - User ID: ' + user.uid.substring(0, 8) + '...');
+                
                 // Load data from Firestore
                 await loadAllData();
             } else {
@@ -472,6 +480,27 @@
     
     <!-- Main app logic -->
     <script>
+        // Debug message helper
+        function addDebugMessage(message, isError = false) {
+            const debugDiv = document.getElementById('debugMessages');
+            if (!debugDiv) return;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const color = isError ? '#ef4444' : '#10b981';
+            const icon = isError ? '✗' : '✓';
+            
+            const msgHtml = `<div style="color: ${color}; margin: 3px 0;">[${timestamp}] ${icon} ${message}</div>`;
+            debugDiv.innerHTML = msgHtml + debugDiv.innerHTML;
+            
+            // Keep only last 10 messages
+            const messages = debugDiv.querySelectorAll('div');
+            if (messages.length > 10) {
+                for (let i = 10; i < messages.length; i++) {
+                    messages[i].remove();
+                }
+            }
+        }
+        
         // App state
         let data = {
             dailyAllowance: 20,
@@ -484,6 +513,8 @@
         
         // Load all data from Firestore
         async function loadAllData() {
+            addDebugMessage('Starting to load data from Firestore...');
+            
             const cloudData = await loadAllDataFromFirestore();
             
             // Load settings
@@ -492,11 +523,17 @@
                 data.startDate = cloudData.settings.startDate || new Date().toISOString().split('T')[0];
                 data.frozenBalance = cloudData.settings.frozenBalance || 0;
                 data.manualAdjustment = cloudData.settings.manualAdjustment || 0;
+                addDebugMessage('Loaded settings from cloud');
+            } else {
+                addDebugMessage('No settings found in cloud, using defaults');
             }
             
             // Load spending and proposed
             data.spending = cloudData.spending;
             data.proposed = cloudData.proposed;
+            
+            addDebugMessage(`Loaded ${data.spending.length} spending entries from cloud`);
+            addDebugMessage(`Loaded ${data.proposed.length} proposed items from cloud`);
             
             // Update form fields
             document.getElementById('dailyAllowance').value = data.dailyAllowance;
@@ -628,8 +665,12 @@
                 date: date
             };
             
+            addDebugMessage(`Saving spending: $${amount} for "${name}"...`);
+            
             // Save to Firestore
             await saveSpendingToFirestore(entry);
+            
+            addDebugMessage('Spending saved to cloud ✓');
             
             // Add to local state
             data.spending.push(entry);
@@ -666,8 +707,12 @@
                 amount: amount
             };
             
+            addDebugMessage(`Saving proposed: $${amount} for "${name}"...`);
+            
             // Save to Firestore
             await saveProposedToFirestore(item);
+            
+            addDebugMessage('Proposed item saved to cloud ✓');
             
             // Add to local state
             data.proposed.push(item);
