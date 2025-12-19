@@ -107,7 +107,8 @@ async function updateProposedInFirestore(itemId, item) {
     
     try {
         await db.collection('users').doc(user.uid).collection('moneyProposed').doc(itemId).update({
-            checked: item.checked
+            checked: item.checked,
+            amount: item.amount
         });
         console.log('Proposed item updated in Firestore');
     } catch (error) {
