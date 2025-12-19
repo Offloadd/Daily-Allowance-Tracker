@@ -315,7 +315,14 @@
     <div id="authContainer" class="container">
         <h2>💰 Daily Allowance Tracker</h2>
         <p style="margin-bottom: 20px; color: #666;">Sign in to sync your budget across all devices</p>
-        <button onclick="signInAnonymously()">Sign In</button>
+        <div style="max-width: 400px; margin: 0 auto;">
+            <input type="email" id="emailInput" placeholder="Email" style="width: 100%; padding: 12px; margin-bottom: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1em;">
+            <input type="password" id="passwordInput" placeholder="Password" style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1em;">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="signIn()" style="flex: 1;">Sign In</button>
+                <button onclick="signUp()" style="flex: 1; background: #764ba2;">Sign Up</button>
+            </div>
+        </div>
     </div>
     
     <!-- Main App (shown when logged in) -->
