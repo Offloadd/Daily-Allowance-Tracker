@@ -341,6 +341,16 @@
                 <div class="balance-item">
                     <div class="balance-label">Available Balance</div>
                     <div class="balance-amount" id="availableBalance">$0.00</div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="toggleBalanceEdit()" id="editBalanceBtn" style="background: rgba(255,255,255,0.3); color: white; border: 2px solid white; padding: 6px 12px; font-size: 0.85em;">Edit Balance</button>
+                    </div>
+                    <div id="balanceEditSection" style="display: none; margin-top: 10px;">
+                        <input type="number" id="balanceEditInput" step="0.01" style="width: 100%; padding: 8px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; background: rgba(255,255,255,0.9); margin-bottom: 8px;">
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="saveBalanceEdit()" style="background: #4ade80; color: white; border: none; padding: 6px 12px; font-size: 0.85em; flex: 1;">Save</button>
+                            <button onclick="cancelBalanceEdit()" style="background: rgba(255,255,255,0.3); color: white; border: 2px solid white; padding: 6px 12px; font-size: 0.85em; flex: 1;">Cancel</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div style="margin-top: 20px; background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
@@ -459,6 +469,7 @@
         let data = {
             dailyAllowance: 20,
             startDate: new Date().toISOString().split('T')[0],
+            frozenBalance: 0,
             manualAdjustment: 0,
             spending: [],
             proposed: []
@@ -472,6 +483,7 @@
             if (cloudData.settings) {
                 data.dailyAllowance = cloudData.settings.dailyAllowance || 20;
                 data.startDate = cloudData.settings.startDate || new Date().toISOString().split('T')[0];
+                data.frozenBalance = cloudData.settings.frozenBalance || 0;
                 data.manualAdjustment = cloudData.settings.manualAdjustment || 0;
             }
             
@@ -489,16 +501,33 @@
         }
         
         async function updateSettings() {
-            data.dailyAllowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
-            data.startDate = document.getElementById('startDate').value;
+            const newAllowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
+            const newStartDate = document.getElementById('startDate').value;
+            
+            // If daily allowance changed, snapshot the current balance
+            if (newAllowance !== data.dailyAllowance) {
+                const currentBalance = calculateAccumulated() - calculateTotalSpent();
+                data.frozenBalance = currentBalance;
+                data.startDate = new Date().toISOString().split('T')[0]; // Reset to today
+            } else {
+                // If only start date changed, keep it
+                data.startDate = newStartDate;
+            }
+            
+            data.dailyAllowance = newAllowance;
             
             const settings = {
                 dailyAllowance: data.dailyAllowance,
                 startDate: data.startDate,
+                frozenBalance: data.frozenBalance,
                 manualAdjustment: data.manualAdjustment
             };
             
             await saveSettingsToFirestore(settings);
+            
+            // Update form to show new start date
+            document.getElementById('startDate').value = data.startDate;
+            
             updateDisplay();
         }
         
@@ -508,6 +537,7 @@
             const settings = {
                 dailyAllowance: data.dailyAllowance,
                 startDate: data.startDate,
+                frozenBalance: data.frozenBalance,
                 manualAdjustment: data.manualAdjustment
             };
             
@@ -515,13 +545,59 @@
             updateDisplay();
         }
         
+        function toggleBalanceEdit() {
+            const editSection = document.getElementById('balanceEditSection');
+            const editBtn = document.getElementById('editBalanceBtn');
+            const currentBalance = calculateAccumulated() - calculateTotalSpent();
+            
+            if (editSection.style.display === 'none') {
+                // Show edit mode
+                document.getElementById('balanceEditInput').value = currentBalance.toFixed(2);
+                editSection.style.display = 'block';
+                editBtn.style.display = 'none';
+            }
+        }
+        
+        async function saveBalanceEdit() {
+            const newBalance = parseFloat(document.getElementById('balanceEditInput').value) || 0;
+            const spent = calculateTotalSpent();
+            
+            // Set frozenBalance to achieve the desired available balance
+            // available = frozen + dailyAccumulation + manualAdj - spent
+            // So: frozen = available + spent - dailyAccumulation - manualAdj
+            const start = new Date(data.startDate);
+            const today = new Date();
+            const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
+            const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
+            
+            data.frozenBalance = newBalance + spent - dailyTotal - (data.manualAdjustment || 0);
+            
+            const settings = {
+                dailyAllowance: data.dailyAllowance,
+                startDate: data.startDate,
+                frozenBalance: data.frozenBalance,
+                manualAdjustment: data.manualAdjustment
+            };
+            
+            await saveSettingsToFirestore(settings);
+            
+            cancelBalanceEdit();
+            updateDisplay();
+        }
+        
+        function cancelBalanceEdit() {
+            document.getElementById('balanceEditSection').style.display = 'none';
+            document.getElementById('editBalanceBtn').style.display = 'block';
+        }
+        
         function calculateAccumulated() {
             const start = new Date(data.startDate);
             const today = new Date();
             const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
             const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
+            const frozen = data.frozenBalance || 0;
             const manualAdj = data.manualAdjustment || 0;
-            return dailyTotal + manualAdj;
+            return frozen + dailyTotal + manualAdj;
         }
         
         function calculateTotalSpent() {
