@@ -99,6 +99,22 @@ async function deleteProposedFromFirestore(itemId) {
     }
 }
 
+async function updateProposedInFirestore(itemId, item) {
+    const user = window.currentUser;
+    if (!user || !window.db || !itemId) {
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(user.uid).collection('moneyProposed').doc(itemId).update({
+            checked: item.checked
+        });
+        console.log('Proposed item updated in Firestore');
+    } catch (error) {
+        console.error('Error updating proposed in Firestore:', error);
+    }
+}
+
 async function loadProposedFromFirestore() {
     const user = window.currentUser;
     if (!user || !window.db) {
