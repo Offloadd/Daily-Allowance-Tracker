@@ -421,13 +421,11 @@
             <div class="input-group">
                 <label style="display: flex; align-items: center; gap: 10px; flex: 1;">
                     <span style="white-space: nowrap;">Daily Allowance: $</span>
-                    <input type="number" id="dailyAllowance" value="20" step="0.01" min="0">
+                    <input type="number" id="dailyAllowance" value="20" step="0.01" min="0" disabled>
                 </label>
-                <label style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                    <span style="white-space: nowrap;">Start Date:</span>
-                    <input type="date" id="startDate">
-                </label>
-                <button onclick="updateSettings()">Update Settings</button>
+                <button onclick="toggleAllowanceEdit()" id="editAllowanceBtn">Edit</button>
+                <button onclick="saveAllowanceEdit()" id="saveAllowanceBtn" style="display: none; background: #4ade80;">Save</button>
+                <button onclick="cancelAllowanceEdit()" id="cancelAllowanceBtn" style="display: none;">Cancel</button>
             </div>
         </div>
     </div>
@@ -537,25 +535,36 @@
             
             // Update form fields
             document.getElementById('dailyAllowance').value = data.dailyAllowance;
-            document.getElementById('startDate').value = data.startDate;
             document.getElementById('manualAdjustment').value = data.manualAdjustment;
             document.getElementById('spendingDate').value = new Date().toISOString().split('T')[0];
             
             updateDisplay();
         }
         
-        async function updateSettings() {
-            const newAllowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
-            const newStartDate = document.getElementById('startDate').value;
+        async function toggleAllowanceEdit() {
+            const input = document.getElementById('dailyAllowance');
+            const editBtn = document.getElementById('editAllowanceBtn');
+            const saveBtn = document.getElementById('saveAllowanceBtn');
+            const cancelBtn = document.getElementById('cancelAllowanceBtn');
             
-            // If daily allowance changed, snapshot the current balance
+            input.disabled = false;
+            input.focus();
+            input.select();
+            editBtn.style.display = 'none';
+            saveBtn.style.display = 'block';
+            cancelBtn.style.display = 'block';
+        }
+        
+        async function saveAllowanceEdit() {
+            const newAllowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
+            
+            // If allowance changed, snapshot the current balance
             if (newAllowance !== data.dailyAllowance) {
                 const currentBalance = calculateAccumulated() - calculateTotalSpent();
                 data.frozenBalance = currentBalance;
                 data.startDate = new Date().toISOString().split('T')[0]; // Reset to today
-            } else {
-                // If only start date changed, keep it
-                data.startDate = newStartDate;
+                
+                addDebugMessage(`Rate changed from $${data.dailyAllowance} to $${newAllowance}, balance frozen at $${currentBalance.toFixed(2)}`);
             }
             
             data.dailyAllowance = newAllowance;
@@ -568,11 +577,23 @@
             };
             
             await saveSettingsToFirestore(settings);
+            addDebugMessage('Settings saved to cloud ✓');
             
-            // Update form to show new start date
-            document.getElementById('startDate').value = data.startDate;
-            
+            cancelAllowanceEdit();
             updateDisplay();
+        }
+        
+        function cancelAllowanceEdit() {
+            const input = document.getElementById('dailyAllowance');
+            const editBtn = document.getElementById('editAllowanceBtn');
+            const saveBtn = document.getElementById('saveAllowanceBtn');
+            const cancelBtn = document.getElementById('cancelAllowanceBtn');
+            
+            input.disabled = true;
+            input.value = data.dailyAllowance;
+            editBtn.style.display = 'block';
+            saveBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
         }
         
         async function updateManualAdjustment() {
@@ -704,7 +725,8 @@
             const item = {
                 id: Date.now(),
                 name: name,
-                amount: amount
+                amount: amount,
+                checked: false
             };
             
             addDebugMessage(`Saving proposed: $${amount} for "${name}"...`);
@@ -730,6 +752,20 @@
             
             // Remove from local state
             data.proposed = data.proposed.filter(item => item.id !== id);
+            
+            updateDisplay();
+        }
+        
+        async function toggleProposedCheck(id, firestoreId) {
+            // Find the item in local state
+            const item = data.proposed.find(i => i.id === id);
+            if (!item) return;
+            
+            // Toggle checked state
+            item.checked = !item.checked;
+            
+            // Update in Firestore
+            await updateProposedInFirestore(firestoreId, item);
             
             updateDisplay();
         }
@@ -768,16 +804,21 @@
             proposedList.innerHTML = data.proposed.map(item => {
                 const canAfford = runningBalance >= item.amount;
                 if (canAfford) runningBalance -= item.amount;
+                const checked = item.checked || false;
+                const strikethrough = checked ? 'text-decoration: line-through; opacity: 0.6;' : '';
                 
                 return `
                     <li class="item proposed-item ${canAfford ? 'can-afford' : 'cannot-afford'}">
-                        <div class="item-details">
+                        <button onclick="toggleProposedCheck(${item.id}, '${item.firestoreId || ''}')" style="background: none; border: 2px solid #667eea; color: #667eea; padding: 8px 12px; margin-right: 10px; font-size: 1.2em; cursor: pointer; border-radius: 5px; min-width: 40px;">
+                            ${checked ? '✓' : '○'}
+                        </button>
+                        <div class="item-details" style="${strikethrough}">
                             <div class="item-name">${item.name}</div>
                             <span class="afford-status ${canAfford ? 'afford-yes' : 'afford-no'}">
                                 ${canAfford ? '✓ Can Afford' : '✗ Cannot Afford'}
                             </span>
                         </div>
-                        <span class="item-amount">$${item.amount.toFixed(2)}</span>
+                        <span class="item-amount" style="${strikethrough}">$${item.amount.toFixed(2)}</span>
                         <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')">Delete</button>
                     </li>
                 `;
