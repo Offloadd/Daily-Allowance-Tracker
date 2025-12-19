@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Allowance Tracker</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -32,6 +38,38 @@
             text-align: center;
             margin-bottom: 30px;
             font-size: 2em;
+        }
+        
+        /* Auth Container */
+        #authContainer {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        #authContainer h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        #authContainer button {
+            padding: 15px 30px;
+            font-size: 1.1em;
+        }
+        
+        /* Logout Button */
+        .logout-section {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        
+        .logout-btn {
+            background: #ef4444;
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+        
+        .logout-btn:hover {
+            background: #dc2626;
         }
         
         .balance-section {
@@ -273,7 +311,19 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Auth Container (shown when not logged in) -->
+    <div id="authContainer" class="container">
+        <h2>💰 Daily Allowance Tracker</h2>
+        <p style="margin-bottom: 20px; color: #666;">Sign in to sync your budget across all devices</p>
+        <button onclick="signInAnonymously()">Sign In</button>
+    </div>
+    
+    <!-- Main App (shown when logged in) -->
+    <div id="app" class="container" style="display: none;">
+        <div class="logout-section">
+            <button class="logout-btn" onclick="signOut()">Logout</button>
+        </div>
+        
         <h1>💰 Daily Allowance Tracker</h1>
         
         <!-- Balance Overview -->
@@ -291,6 +341,16 @@
                 <div class="balance-item">
                     <div class="balance-label">Available Balance</div>
                     <div class="balance-amount" id="availableBalance">$0.00</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <label style="color: white; white-space: nowrap;">Manual Adjustment: $</label>
+                    <input type="number" id="manualAdjustment" step="0.01" style="flex: 1; min-width: 150px; padding: 8px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; background: rgba(255,255,255,0.9);">
+                    <button onclick="updateManualAdjustment()" style="background: rgba(255,255,255,0.3); color: white; border: 2px solid white; padding: 8px 16px;">Update</button>
+                </div>
+                <div style="color: white; font-size: 0.85em; margin-top: 8px; opacity: 0.9;">
+                    Add or subtract from balance (daily allowance will continue to accumulate)
                 </div>
             </div>
         </div>
@@ -349,43 +409,126 @@
         </div>
     </div>
     
+    <!-- Firebase Initialization -->
     <script>
-        // Initialize data from localStorage or defaults
-        let data = JSON.parse(localStorage.getItem('moneyTrackerData')) || {
+        const firebaseConfig = {
+            apiKey: "AIzaSyA89BZxelKRoK64JnYtSdWUho2WUfWymII",
+            authDomain: "capacity-monitor.firebaseapp.com",
+            projectId: "capacity-monitor",
+            storageBucket: "capacity-monitor.firebasestorage.app",
+            messagingSenderId: "455641716280",
+            appId: "1:455641716280:web:5848888e290e47114c78cd",
+            measurementId: "G-CGR5R0D1SP"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        window.db = db;
+        window.currentUser = null;
+
+        // Auth state observer
+        auth.onAuthStateChanged(async user => {
+            if (user) {
+                document.getElementById('authContainer').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                window.currentUser = user;
+                
+                // Load data from Firestore
+                await loadAllData();
+            } else {
+                document.getElementById('authContainer').style.display = 'block';
+                document.getElementById('app').style.display = 'none';
+                window.currentUser = null;
+            }
+        });
+    </script>
+    
+    <!-- Auth functions -->
+    <script src="auth.js"></script>
+    
+    <!-- Storage functions -->
+    <script src="storage.js"></script>
+    
+    <!-- Firestore functions -->
+    <script src="firestore.js"></script>
+    
+    <!-- Main app logic -->
+    <script>
+        // App state
+        let data = {
             dailyAllowance: 20,
             startDate: new Date().toISOString().split('T')[0],
+            manualAdjustment: 0,
             spending: [],
             proposed: []
         };
         
-        // Initialize form fields
-        document.getElementById('dailyAllowance').value = data.dailyAllowance;
-        document.getElementById('startDate').value = data.startDate;
-        document.getElementById('spendingDate').value = new Date().toISOString().split('T')[0];
-        
-        function saveData() {
-            localStorage.setItem('moneyTrackerData', JSON.stringify(data));
+        // Load all data from Firestore
+        async function loadAllData() {
+            const cloudData = await loadAllDataFromFirestore();
+            
+            // Load settings
+            if (cloudData.settings) {
+                data.dailyAllowance = cloudData.settings.dailyAllowance || 20;
+                data.startDate = cloudData.settings.startDate || new Date().toISOString().split('T')[0];
+                data.manualAdjustment = cloudData.settings.manualAdjustment || 0;
+            }
+            
+            // Load spending and proposed
+            data.spending = cloudData.spending;
+            data.proposed = cloudData.proposed;
+            
+            // Update form fields
+            document.getElementById('dailyAllowance').value = data.dailyAllowance;
+            document.getElementById('startDate').value = data.startDate;
+            document.getElementById('manualAdjustment').value = data.manualAdjustment;
+            document.getElementById('spendingDate').value = new Date().toISOString().split('T')[0];
+            
             updateDisplay();
         }
         
-        function updateSettings() {
+        async function updateSettings() {
             data.dailyAllowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
             data.startDate = document.getElementById('startDate').value;
-            saveData();
+            
+            const settings = {
+                dailyAllowance: data.dailyAllowance,
+                startDate: data.startDate,
+                manualAdjustment: data.manualAdjustment
+            };
+            
+            await saveSettingsToFirestore(settings);
+            updateDisplay();
+        }
+        
+        async function updateManualAdjustment() {
+            data.manualAdjustment = parseFloat(document.getElementById('manualAdjustment').value) || 0;
+            
+            const settings = {
+                dailyAllowance: data.dailyAllowance,
+                startDate: data.startDate,
+                manualAdjustment: data.manualAdjustment
+            };
+            
+            await saveSettingsToFirestore(settings);
+            updateDisplay();
         }
         
         function calculateAccumulated() {
             const start = new Date(data.startDate);
             const today = new Date();
-            const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1; // +1 to include start day
-            return daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
+            const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
+            const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
+            const manualAdj = data.manualAdjustment || 0;
+            return dailyTotal + manualAdj;
         }
         
         function calculateTotalSpent() {
             return data.spending.reduce((sum, item) => sum + item.amount, 0);
         }
         
-        function addSpending() {
+        async function addSpending() {
             const name = document.getElementById('spendingName').value.trim();
             const amount = parseFloat(document.getElementById('spendingAmount').value);
             const date = document.getElementById('spendingDate').value;
@@ -395,26 +538,37 @@
                 return;
             }
             
-            data.spending.push({
+            const entry = {
                 id: Date.now(),
                 name: name,
                 amount: amount,
                 date: date
-            });
+            };
+            
+            // Save to Firestore
+            await saveSpendingToFirestore(entry);
+            
+            // Add to local state
+            data.spending.push(entry);
             
             // Clear inputs
             document.getElementById('spendingName').value = '';
             document.getElementById('spendingAmount').value = '';
             
-            saveData();
+            updateDisplay();
         }
         
-        function deleteSpending(id) {
+        async function deleteSpending(id, firestoreId) {
+            // Delete from Firestore
+            await deleteSpendingFromFirestore(firestoreId);
+            
+            // Remove from local state
             data.spending = data.spending.filter(item => item.id !== id);
-            saveData();
+            
+            updateDisplay();
         }
         
-        function addProposed() {
+        async function addProposed() {
             const name = document.getElementById('proposedName').value.trim();
             const amount = parseFloat(document.getElementById('proposedAmount').value);
             
@@ -423,22 +577,33 @@
                 return;
             }
             
-            data.proposed.push({
+            const item = {
                 id: Date.now(),
                 name: name,
                 amount: amount
-            });
+            };
+            
+            // Save to Firestore
+            await saveProposedToFirestore(item);
+            
+            // Add to local state
+            data.proposed.push(item);
             
             // Clear inputs
             document.getElementById('proposedName').value = '';
             document.getElementById('proposedAmount').value = '';
             
-            saveData();
+            updateDisplay();
         }
         
-        function deleteProposed(id) {
+        async function deleteProposed(id, firestoreId) {
+            // Delete from Firestore
+            await deleteProposedFromFirestore(firestoreId);
+            
+            // Remove from local state
             data.proposed = data.proposed.filter(item => item.id !== id);
-            saveData();
+            
+            updateDisplay();
         }
         
         function updateDisplay() {
@@ -463,7 +628,7 @@
                             <div class="item-date">${new Date(item.date).toLocaleDateString()}</div>
                         </div>
                         <span class="item-amount">$${item.amount.toFixed(2)}</span>
-                        <button class="delete-btn" onclick="deleteSpending(${item.id})">Delete</button>
+                        <button class="delete-btn" onclick="deleteSpending(${item.id}, '${item.firestoreId || ''}')">Delete</button>
                     </li>
                 `).join('');
             
@@ -485,7 +650,7 @@
                             </span>
                         </div>
                         <span class="item-amount">$${item.amount.toFixed(2)}</span>
-                        <button class="delete-btn" onclick="deleteProposed(${item.id})">Delete</button>
+                        <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')">Delete</button>
                     </li>
                 `;
             }).join('');
@@ -497,9 +662,6 @@
             document.getElementById('remainingAfter').textContent = `$${remainingAfter.toFixed(2)}`;
             document.getElementById('remainingAfter').className = remainingAfter >= 0 ? 'proposed-totals-amount totals-positive' : 'proposed-totals-amount totals-negative';
         }
-        
-        // Initial display
-        updateDisplay();
     </script>
 </body>
 </html>
