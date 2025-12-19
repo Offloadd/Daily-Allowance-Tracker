@@ -809,8 +809,8 @@
                 
                 return `
                     <li class="item proposed-item ${canAfford ? 'can-afford' : 'cannot-afford'}">
-                        <button onclick="toggleProposedCheck(${item.id}, '${item.firestoreId || ''}')" style="background: none; border: 2px solid #667eea; color: #667eea; padding: 8px 12px; margin-right: 10px; font-size: 1.2em; cursor: pointer; border-radius: 5px; min-width: 40px;">
-                            ${checked ? '✓' : '○'}
+                        <button onclick="toggleProposedCheck(${item.id}, '${item.firestoreId || ''}')" style="background: ${checked ? '#667eea' : 'white'}; border: 2px solid #667eea; color: ${checked ? 'white' : '#667eea'}; padding: 8px 12px; margin-right: 10px; font-size: 1.4em; cursor: pointer; border-radius: 5px; min-width: 40px; font-weight: bold;">
+                            ${checked ? '✕' : '○'}
                         </button>
                         <div class="item-details" style="${strikethrough}">
                             <div class="item-name">${item.name}</div>
