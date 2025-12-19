@@ -308,6 +308,92 @@
         .totals-negative {
             color: #f87171;
         }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            input[type="number"], input[type="date"], input[type="text"] {
+                min-width: 100%;
+                width: 100%;
+            }
+            
+            button {
+                width: 100%;
+            }
+            
+            .balance-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .balance-amount {
+                font-size: 1.5em;
+            }
+            
+            #proposedList {
+                grid-template-columns: 1fr;
+            }
+            
+            .item {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .item-details {
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+            
+            .item-name {
+                word-break: break-word;
+            }
+            
+            .item-amount {
+                margin-right: 8px;
+                font-size: 1em;
+            }
+            
+            .delete-btn, .item button {
+                font-size: 0.85em;
+                padding: 6px 10px;
+                flex-shrink: 0;
+            }
+            
+            .proposed-totals {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .logout-section {
+                margin-bottom: 15px;
+            }
+            
+            #debugStatus {
+                font-size: 0.8em;
+                padding: 10px;
+                overflow-x: auto;
+            }
+            
+            #debugMessages {
+                font-size: 0.85em;
+                word-break: break-word;
+            }
+        }
     </style>
 </head>
 <body>
@@ -858,25 +944,28 @@
                 const isEditing = window.editingProposed && window.editingProposed[item.id];
                 
                 return `
-                    <li class="item proposed-item ${canAfford ? 'can-afford' : 'cannot-afford'}">
-                        <button onclick="toggleProposedCheck(${item.id}, '${item.firestoreId || ''}')" style="background: ${checked ? '#667eea' : 'white'}; border: 2px solid #667eea; color: ${checked ? 'white' : '#667eea'}; padding: 8px 12px; margin-right: 10px; font-size: 1.4em; cursor: pointer; border-radius: 5px; min-width: 40px; font-weight: bold;">
+                    <li class="item proposed-item ${canAfford ? 'can-afford' : 'cannot-afford'}" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                        <button onclick="toggleProposedCheck(${item.id}, '${item.firestoreId || ''}')" style="background: ${checked ? '#667eea' : 'white'}; border: 2px solid #667eea; color: ${checked ? 'white' : '#667eea'}; padding: 8px; margin: 0; font-size: 1.2em; cursor: pointer; border-radius: 5px; width: 36px; height: 36px; flex-shrink: 0; font-weight: bold; display: flex; align-items: center; justify-content: center;">
                             ${checked ? '✕' : '○'}
                         </button>
-                        <div class="item-details" style="${strikethrough}">
-                            <div class="item-name">${item.name}</div>
+                        <div class="item-details" style="${strikethrough} flex: 1; min-width: 0;">
+                            <div class="item-name" style="word-break: break-word;">${item.name}</div>
                             <span class="afford-status ${canAfford ? 'afford-yes' : 'afford-no'}">
                                 ${canAfford ? '✓ Can Afford' : '✗ Cannot Afford'}
                             </span>
                         </div>
                         ${isEditing ? `
-                            <input type="number" id="editAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="width: 80px; padding: 5px; border: 2px solid #667eea; border-radius: 5px; margin-right: 10px; font-size: 1em;">
-                            <button onclick="saveEditProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 5px; font-size: 0.85em; cursor: pointer;">Save</button>
-                            <button onclick="cancelEditProposed(${item.id})" style="background: #6b7280; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 5px; font-size: 0.85em; cursor: pointer;">Cancel</button>
+                            <div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center; width: 100%;">
+                                <input type="number" id="editAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="flex: 1; min-width: 100px; padding: 8px; border: 2px solid #667eea; border-radius: 5px; font-size: 1em;">
+                                <button onclick="saveEditProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Save</button>
+                                <button onclick="cancelEditProposed(${item.id})" style="background: #6b7280; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Cancel</button>
+                                <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
+                            </div>
                         ` : `
-                            <span class="item-amount" style="${strikethrough}">$${item.amount.toFixed(2)}</span>
-                            <button onclick="startEditProposed(${item.id})" style="background: #667eea; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 5px; font-size: 0.85em; cursor: pointer;">Edit</button>
+                            <span class="item-amount" style="${strikethrough} flex-shrink: 0; margin: 0;">$${item.amount.toFixed(2)}</span>
+                            <button onclick="startEditProposed(${item.id})" style="background: #667eea; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">Edit</button>
+                            <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
                         `}
-                        <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')">Delete</button>
                     </li>
                 `;
             }).join('');
