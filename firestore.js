@@ -8,6 +8,7 @@ async function saveSpendingToFirestore(entry) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized, skipping cloud save');
+        if (window.addDebugMessage) window.addDebugMessage('ERROR: Not logged in or Firestore not ready', true);
         return;
     }
     
@@ -16,6 +17,7 @@ async function saveSpendingToFirestore(entry) {
         console.log('Spending entry saved to Firestore');
     } catch (error) {
         console.error('Error saving spending to Firestore:', error);
+        if (window.addDebugMessage) window.addDebugMessage('ERROR saving: ' + error.message, true);
     }
 }
 
@@ -37,6 +39,7 @@ async function loadSpendingFromFirestore() {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized');
+        if (window.addDebugMessage) window.addDebugMessage('ERROR: Cannot load - not logged in', true);
         return [];
     }
     
@@ -56,6 +59,7 @@ async function loadSpendingFromFirestore() {
         return entries;
     } catch (error) {
         console.error('Error loading spending from Firestore:', error);
+        if (window.addDebugMessage) window.addDebugMessage('ERROR loading spending: ' + error.message, true);
         return [];
     }
 }
@@ -68,6 +72,7 @@ async function saveProposedToFirestore(item) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized, skipping cloud save');
+        if (window.addDebugMessage) window.addDebugMessage('ERROR: Not logged in or Firestore not ready', true);
         return;
     }
     
@@ -76,6 +81,7 @@ async function saveProposedToFirestore(item) {
         console.log('Proposed item saved to Firestore');
     } catch (error) {
         console.error('Error saving proposed to Firestore:', error);
+        if (window.addDebugMessage) window.addDebugMessage('ERROR saving proposed: ' + error.message, true);
     }
 }
 
