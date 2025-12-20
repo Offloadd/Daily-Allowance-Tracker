@@ -143,6 +143,86 @@ async function loadProposedFromFirestore() {
 }
 
 // ============================================
+// WISHLIST
+// ============================================
+
+async function saveWishlistToFirestore(item) {
+    const user = window.currentUser;
+    if (!user || !window.db) {
+        console.log('No user or Firestore not initialized, skipping cloud save');
+        if (window.addDebugMessage) window.addDebugMessage('ERROR: Not logged in or Firestore not ready', true);
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(user.uid).collection('moneyWishList').add(item);
+        console.log('Wishlist item saved to Firestore');
+    } catch (error) {
+        console.error('Error saving wishlist to Firestore:', error);
+        if (window.addDebugMessage) window.addDebugMessage('ERROR saving wishlist: ' + error.message, true);
+    }
+}
+
+async function deleteWishlistFromFirestore(itemId) {
+    const user = window.currentUser;
+    if (!user || !window.db || !itemId) {
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(user.uid).collection('moneyWishList').doc(itemId).delete();
+        console.log('Wishlist item deleted from Firestore');
+    } catch (error) {
+        console.error('Error deleting wishlist from Firestore:', error);
+    }
+}
+
+async function loadWishlistFromFirestore() {
+    const user = window.currentUser;
+    if (!user || !window.db) {
+        console.log('No user or Firestore not initialized');
+        if (window.addDebugMessage) window.addDebugMessage('ERROR: Cannot load - not logged in', true);
+        return [];
+    }
+    
+    try {
+        const snapshot = await db.collection('users')
+            .doc(user.uid)
+            .collection('moneyWishList')
+            .get();
+        
+        const items = [];
+        snapshot.forEach(doc => {
+            items.push({ firestoreId: doc.id, ...doc.data() });
+        });
+        
+        console.log('Loaded', items.length, 'wishlist items from Firestore');
+        return items;
+    } catch (error) {
+        console.error('Error loading wishlist from Firestore:', error);
+        if (window.addDebugMessage) window.addDebugMessage('ERROR loading wishlist: ' + error.message, true);
+        return [];
+    }
+}
+
+async function updateWishlistInFirestore(itemId, item) {
+    const user = window.currentUser;
+    if (!user || !window.db || !itemId) {
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(user.uid).collection('moneyWishList').doc(itemId).update({
+            checked: item.checked,
+            amount: item.amount
+        });
+        console.log('Wishlist item updated in Firestore');
+    } catch (error) {
+        console.error('Error updating wishlist in Firestore:', error);
+    }
+}
+
+// ============================================
 // SETTINGS
 // ============================================
 
@@ -195,11 +275,13 @@ async function loadSettingsFromFirestore() {
 async function loadAllDataFromFirestore() {
     const spending = await loadSpendingFromFirestore();
     const proposed = await loadProposedFromFirestore();
+    const wishlist = await loadWishlistFromFirestore();
     const settings = await loadSettingsFromFirestore();
     
     return {
         spending: spending || [],
         proposed: proposed || [],
+        wishlist: wishlist || [],
         settings: settings || null
     };
 }
