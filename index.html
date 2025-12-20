@@ -113,7 +113,7 @@
             color: #f87171;
         }
         
-        .settings-section, .spending-section, .proposed-section {
+        .settings-section, .spending-section, .proposed-section, .wishlist-section {
             margin-bottom: 30px;
         }
         
@@ -452,16 +452,6 @@
                     </div>
                 </div>
             </div>
-            <div style="margin-top: 20px; background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px;">
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <label style="color: white; white-space: nowrap;">Manual Adjustment: $</label>
-                    <input type="number" id="manualAdjustment" step="0.01" style="flex: 1; min-width: 150px; padding: 8px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px; background: rgba(255,255,255,0.9);">
-                    <button onclick="updateManualAdjustment()" style="background: rgba(255,255,255,0.3); color: white; border: 2px solid white; padding: 8px 16px;">Update</button>
-                </div>
-                <div style="color: white; font-size: 0.85em; margin-top: 8px; opacity: 0.9;">
-                    Add or subtract from balance (daily allowance will continue to accumulate)
-                </div>
-            </div>
         </div>
         
         <!-- Proposed Purchases -->
@@ -487,6 +477,17 @@
                     <div class="proposed-totals-amount" id="remainingAfter">$0.00</div>
                 </div>
             </div>
+        </div>
+        
+        <!-- Wish List -->
+        <div class="wishlist-section">
+            <h2>⭐ Wish List</h2>
+            <div class="input-group">
+                <input type="text" id="wishlistName" placeholder="What do you want someday?">
+                <input type="number" id="wishlistAmount" placeholder="Estimated cost" step="0.01" min="0">
+                <button onclick="addWishlist()">Add to Wish List</button>
+            </div>
+            <ul class="item-list" id="wishlistList"></ul>
         </div>
         
         <!-- Spending -->
@@ -590,9 +591,9 @@
             dailyAllowance: 20,
             startDate: new Date().toISOString().split('T')[0],
             frozenBalance: 0,
-            manualAdjustment: 0,
             spending: [],
-            proposed: []
+            proposed: [],
+            wishlist: []
         };
         
         // Load all data from Firestore
@@ -606,22 +607,22 @@
                 data.dailyAllowance = cloudData.settings.dailyAllowance || 20;
                 data.startDate = cloudData.settings.startDate || new Date().toISOString().split('T')[0];
                 data.frozenBalance = cloudData.settings.frozenBalance || 0;
-                data.manualAdjustment = cloudData.settings.manualAdjustment || 0;
                 addDebugMessage('Loaded settings from cloud');
             } else {
                 addDebugMessage('No settings found in cloud, using defaults');
             }
             
-            // Load spending and proposed
+            // Load spending, proposed, and wishlist
             data.spending = cloudData.spending;
             data.proposed = cloudData.proposed;
+            data.wishlist = cloudData.wishlist || [];
             
             addDebugMessage(`Loaded ${data.spending.length} spending entries from cloud`);
             addDebugMessage(`Loaded ${data.proposed.length} proposed items from cloud`);
+            addDebugMessage(`Loaded ${data.wishlist.length} wishlist items from cloud`);
             
             // Update form fields
             document.getElementById('dailyAllowance').value = data.dailyAllowance;
-            document.getElementById('manualAdjustment').value = data.manualAdjustment;
             document.getElementById('spendingDate').value = new Date().toISOString().split('T')[0];
             
             updateDisplay();
@@ -658,8 +659,7 @@
             const settings = {
                 dailyAllowance: data.dailyAllowance,
                 startDate: data.startDate,
-                frozenBalance: data.frozenBalance,
-                manualAdjustment: data.manualAdjustment
+                frozenBalance: data.frozenBalance
             };
             
             await saveSettingsToFirestore(settings);
@@ -680,20 +680,6 @@
             editBtn.style.display = 'block';
             saveBtn.style.display = 'none';
             cancelBtn.style.display = 'none';
-        }
-        
-        async function updateManualAdjustment() {
-            data.manualAdjustment = parseFloat(document.getElementById('manualAdjustment').value) || 0;
-            
-            const settings = {
-                dailyAllowance: data.dailyAllowance,
-                startDate: data.startDate,
-                frozenBalance: data.frozenBalance,
-                manualAdjustment: data.manualAdjustment
-            };
-            
-            await saveSettingsToFirestore(settings);
-            updateDisplay();
         }
         
         function toggleBalanceEdit() {
@@ -721,13 +707,12 @@
             const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
             const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
             
-            data.frozenBalance = newBalance + spent - dailyTotal - (data.manualAdjustment || 0);
+            data.frozenBalance = newBalance + spent - dailyTotal;
             
             const settings = {
                 dailyAllowance: data.dailyAllowance,
                 startDate: data.startDate,
-                frozenBalance: data.frozenBalance,
-                manualAdjustment: data.manualAdjustment
+                frozenBalance: data.frozenBalance
             };
             
             await saveSettingsToFirestore(settings);
@@ -747,8 +732,7 @@
             const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
             const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
             const frozen = data.frozenBalance || 0;
-            const manualAdj = data.manualAdjustment || 0;
-            return frozen + dailyTotal + manualAdj;
+            return frozen + dailyTotal;
         }
         
         function calculateTotalSpent() {
@@ -838,6 +822,161 @@
             
             // Remove from local state
             data.proposed = data.proposed.filter(item => item.id !== id);
+            
+            updateDisplay();
+        }
+        
+        async function moveToWishlist(id, firestoreId) {
+            // Find item in proposed
+            const item = data.proposed.find(i => i.id === id);
+            if (!item) return;
+            
+            // Delete from proposed in Firestore
+            await deleteProposedFromFirestore(firestoreId);
+            
+            // Remove from proposed local state
+            data.proposed = data.proposed.filter(i => i.id !== id);
+            
+            // Create new wishlist item (new ID and no firestoreId yet)
+            const wishlistItem = {
+                id: Date.now(),
+                name: item.name,
+                amount: item.amount,
+                checked: false
+            };
+            
+            // Add to wishlist in Firestore
+            await saveWishlistToFirestore(wishlistItem);
+            
+            // Add to wishlist local state
+            data.wishlist.push(wishlistItem);
+            
+            addDebugMessage(`Moved "${item.name}" to wish list`);
+            updateDisplay();
+        }
+        
+        async function addWishlist() {
+            const name = document.getElementById('wishlistName').value.trim();
+            const amount = parseFloat(document.getElementById('wishlistAmount').value);
+            
+            if (!name || !amount || amount <= 0) {
+                alert('Please fill in all wishlist fields');
+                return;
+            }
+            
+            const item = {
+                id: Date.now(),
+                name: name,
+                amount: amount,
+                checked: false
+            };
+            
+            addDebugMessage(`Saving wishlist item: $${amount} for "${name}"...`);
+            
+            // Save to Firestore
+            await saveWishlistToFirestore(item);
+            
+            addDebugMessage('Wishlist item saved to cloud ✓');
+            
+            // Add to local state
+            data.wishlist.push(item);
+            
+            // Clear inputs
+            document.getElementById('wishlistName').value = '';
+            document.getElementById('wishlistAmount').value = '';
+            
+            updateDisplay();
+        }
+        
+        async function deleteWishlist(id, firestoreId) {
+            // Delete from Firestore
+            await deleteWishlistFromFirestore(firestoreId);
+            
+            // Remove from local state
+            data.wishlist = data.wishlist.filter(item => item.id !== id);
+            
+            updateDisplay();
+        }
+        
+        async function moveToProposed(id, firestoreId) {
+            // Find item in wishlist
+            const item = data.wishlist.find(i => i.id === id);
+            if (!item) return;
+            
+            // Delete from wishlist in Firestore
+            await deleteWishlistFromFirestore(firestoreId);
+            
+            // Remove from wishlist local state
+            data.wishlist = data.wishlist.filter(i => i.id !== id);
+            
+            // Create new proposed item (new ID and no firestoreId yet)
+            const proposedItem = {
+                id: Date.now(),
+                name: item.name,
+                amount: item.amount,
+                checked: false
+            };
+            
+            // Add to proposed in Firestore
+            await saveProposedToFirestore(proposedItem);
+            
+            // Add to proposed local state
+            data.proposed.push(proposedItem);
+            
+            addDebugMessage(`Moved "${item.name}" to proposed purchases`);
+            updateDisplay();
+        }
+        
+        async function toggleWishlistCheck(id, firestoreId) {
+            const item = data.wishlist.find(i => i.id === id);
+            if (!item) return;
+            
+            item.checked = !item.checked;
+            await updateWishlistInFirestore(firestoreId, item);
+            
+            updateDisplay();
+        }
+        
+        function startEditWishlist(id) {
+            const item = data.wishlist.find(i => i.id === id);
+            if (!item) return;
+            
+            if (!window.editingWishlist) window.editingWishlist = {};
+            window.editingWishlist[id] = {
+                originalAmount: item.amount,
+                editing: true
+            };
+            
+            updateDisplay();
+        }
+        
+        function cancelEditWishlist(id) {
+            if (window.editingWishlist && window.editingWishlist[id]) {
+                delete window.editingWishlist[id];
+            }
+            updateDisplay();
+        }
+        
+        async function saveEditWishlist(id, firestoreId) {
+            const inputElement = document.getElementById(`editWishlistAmount_${id}`);
+            const newAmount = parseFloat(inputElement.value);
+            
+            if (!newAmount || newAmount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            const item = data.wishlist.find(i => i.id === id);
+            if (!item) return;
+            
+            item.amount = newAmount;
+            await updateWishlistInFirestore(firestoreId, item);
+            
+            addDebugMessage(`Updated wishlist "${item.name}" to $${newAmount.toFixed(2)}`);
+            
+            if (window.editingWishlist && window.editingWishlist[id]) {
+                delete window.editingWishlist[id];
+            }
             
             updateDisplay();
         }
@@ -959,12 +1098,47 @@
                                 <input type="number" id="editAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="flex: 1; min-width: 100px; padding: 8px; border: 2px solid #667eea; border-radius: 5px; font-size: 1em;">
                                 <button onclick="saveEditProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Save</button>
                                 <button onclick="cancelEditProposed(${item.id})" style="background: #6b7280; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Cancel</button>
+                                <button onclick="moveToWishlist(${item.id}, '${item.firestoreId || ''}')" style="background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">→ Wish</button>
                                 <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
                             </div>
                         ` : `
                             <span class="item-amount" style="${strikethrough} flex-shrink: 0; margin: 0;">$${item.amount.toFixed(2)}</span>
                             <button onclick="startEditProposed(${item.id})" style="background: #667eea; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">Edit</button>
+                            <button onclick="moveToWishlist(${item.id}, '${item.firestoreId || ''}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">→ Wish</button>
                             <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
+                        `}
+                    </li>
+                `;
+            }).join('');
+            
+            // Update wishlist
+            const wishlistList = document.getElementById('wishlistList');
+            wishlistList.innerHTML = data.wishlist.map(item => {
+                const checked = item.checked || false;
+                const strikethrough = checked ? 'text-decoration: line-through; opacity: 0.6;' : '';
+                const isEditing = window.editingWishlist && window.editingWishlist[item.id];
+                
+                return `
+                    <li class="item" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: #fef3c7;">
+                        <button onclick="toggleWishlistCheck(${item.id}, '${item.firestoreId || ''}')" style="background: ${checked ? '#f59e0b' : 'white'}; border: 2px solid #f59e0b; color: ${checked ? 'white' : '#f59e0b'}; padding: 8px; margin: 0; font-size: 1.2em; cursor: pointer; border-radius: 5px; width: 36px; height: 36px; flex-shrink: 0; font-weight: bold; display: flex; align-items: center; justify-content: center;">
+                            ${checked ? '✕' : '○'}
+                        </button>
+                        <div class="item-details" style="${strikethrough} flex: 1; min-width: 0;">
+                            <div class="item-name" style="word-break: break-word;">${item.name}</div>
+                        </div>
+                        ${isEditing ? `
+                            <div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center; width: 100%;">
+                                <input type="number" id="editWishlistAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="flex: 1; min-width: 100px; padding: 8px; border: 2px solid #f59e0b; border-radius: 5px; font-size: 1em;">
+                                <button onclick="saveEditWishlist(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Save</button>
+                                <button onclick="cancelEditWishlist(${item.id})" style="background: #6b7280; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Cancel</button>
+                                <button onclick="moveToProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #667eea; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">→ Proposed</button>
+                                <button class="delete-btn" onclick="deleteWishlist(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
+                            </div>
+                        ` : `
+                            <span class="item-amount" style="${strikethrough} flex-shrink: 0; margin: 0;">$${item.amount.toFixed(2)}</span>
+                            <button onclick="startEditWishlist(${item.id})" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">Edit</button>
+                            <button onclick="moveToProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #667eea; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">→ Proposed</button>
+                            <button class="delete-btn" onclick="deleteWishlist(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
                         `}
                     </li>
                 `;
