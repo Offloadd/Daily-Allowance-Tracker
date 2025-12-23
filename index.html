@@ -456,6 +456,21 @@
             </button>
         </div>
         
+        <!-- Mode Title Editor -->
+        <div style="text-align: center; margin-bottom: 30px; padding: 15px; background: #f9fafb; border-radius: 10px;">
+            <div id="modeTitleDisplay" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 1.2em; font-weight: 600; color: #667eea;">Current Category: <span id="modeTitleText">Food</span></span>
+                <button onclick="toggleModeTitleEdit()" id="editModeTitleBtn" style="padding: 6px 12px; font-size: 0.9em;">Edit</button>
+            </div>
+            <div id="modeTitleEditSection" style="display: none; margin-top: 10px;">
+                <div style="display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="modeTitleInput" placeholder="Category name" style="padding: 8px; border: 2px solid #667eea; border-radius: 8px; font-size: 1em; min-width: 200px;">
+                    <button onclick="saveModeTitleEdit()" style="background: #4ade80; padding: 8px 16px; font-size: 0.9em;">Save</button>
+                    <button onclick="cancelModeTitleEdit()" style="background: #6b7280; padding: 8px 16px; font-size: 0.9em;">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Balance Overview -->
         <div class="balance-section">
             <h2 style="color: white; margin: 0 0 10px 0;">Your Balance</h2>
