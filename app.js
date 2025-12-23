@@ -103,6 +103,84 @@ function updateModeButtonLabels() {
     document.getElementById('modeMode4Label').textContent = data.mode4.title;
     document.getElementById('modeMode5Label').textContent = data.mode5.title;
     document.getElementById('modeMode6Label').textContent = data.mode6.title;
+    
+    // Also update transfer dropdown options
+    updateTransferDropdown();
+}
+
+// Update transfer dropdown with current mode titles
+function updateTransferDropdown() {
+    const dropdown = document.getElementById('transferToMode');
+    if (!dropdown) return;
+    
+    dropdown.innerHTML = `
+        <option value="">Select mode...</option>
+        <option value="food">${data.food.title}</option>
+        <option value="vehicle">${data.vehicle.title}</option>
+        <option value="home">${data.home.title}</option>
+        <option value="mode4">${data.mode4.title}</option>
+        <option value="mode5">${data.mode5.title}</option>
+        <option value="mode6">${data.mode6.title}</option>
+    `;
+}
+
+// Execute balance transfer
+async function executeTransfer() {
+    const fromMode = currentMode;
+    const toMode = document.getElementById('transferToMode').value;
+    const amount = parseFloat(document.getElementById('transferAmount').value);
+    
+    if (!toMode) {
+        alert('Please select a mode to transfer to');
+        return;
+    }
+    
+    if (toMode === fromMode) {
+        alert('Cannot transfer to the same mode');
+        return;
+    }
+    
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid transfer amount');
+        return;
+    }
+    
+    // Check if current mode has enough balance
+    const currentBalance = calculateAccumulated() - calculateTotalSpent();
+    if (amount > currentBalance) {
+        alert(`Insufficient balance. Available: $${currentBalance.toFixed(2)}`);
+        return;
+    }
+    
+    // Subtract from current mode's frozen balance
+    data[fromMode].frozenBalance -= amount;
+    
+    // Add to target mode's frozen balance
+    data[toMode].frozenBalance += amount;
+    
+    // Save both modes' settings
+    await saveModeSettingsToFirestore(fromMode, {
+        title: data[fromMode].title,
+        dailyAllowance: data[fromMode].dailyAllowance,
+        startDate: data[fromMode].startDate,
+        frozenBalance: data[fromMode].frozenBalance
+    });
+    
+    await saveModeSettingsToFirestore(toMode, {
+        title: data[toMode].title,
+        dailyAllowance: data[toMode].dailyAllowance,
+        startDate: data[toMode].startDate,
+        frozenBalance: data[toMode].frozenBalance
+    });
+    
+    // Clear inputs
+    document.getElementById('transferToMode').value = '';
+    document.getElementById('transferAmount').value = '';
+    
+    // Update display
+    updateDisplay();
+    
+    alert(`Successfully transferred $${amount.toFixed(2)} from ${data[fromMode].title} to ${data[toMode].title}`);
 }
 
 // Load all data from Firestore (all modes)
