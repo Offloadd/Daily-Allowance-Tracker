@@ -552,10 +552,10 @@
         <div class="settings-section">
             <h2>⚙️ Settings</h2>
             <div class="input-group">
-                <label style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                    <span style="white-space: nowrap;">Daily Allowance: $</span>
-                    <input type="number" id="dailyAllowance" value="20" step="0.01" min="0" disabled>
-                </label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="white-space: nowrap;">Daily Allowance: $</label>
+                    <input type="number" id="dailyAllowance" value="20" step="0.01" min="0" disabled style="width: 50px;">
+                </div>
                 <button onclick="toggleAllowanceEdit()" id="editAllowanceBtn">Edit</button>
                 <button onclick="saveAllowanceEdit()" id="saveAllowanceBtn" style="display: none; background: #4ade80;">Save</button>
                 <button onclick="cancelAllowanceEdit()" id="cancelAllowanceBtn" style="display: none;">Cancel</button>
