@@ -5,6 +5,7 @@ let currentMode = 'food'; // Default mode
 
 let data = {
     food: {
+        title: 'Food',
         dailyAllowance: 20,
         startDate: new Date().toISOString().split('T')[0],
         frozenBalance: 0,
@@ -13,6 +14,7 @@ let data = {
         wishlist: []
     },
     vehicle: {
+        title: 'Vehicle',
         dailyAllowance: 10,
         startDate: new Date().toISOString().split('T')[0],
         frozenBalance: 0,
@@ -21,6 +23,7 @@ let data = {
         wishlist: []
     },
     home: {
+        title: 'Home',
         dailyAllowance: 15,
         startDate: new Date().toISOString().split('T')[0],
         frozenBalance: 0,
@@ -51,9 +54,18 @@ function switchMode(mode) {
         activeBtn.classList.add('active');
     }
     
+    // Update mode title display
+    updateModeTitleDisplay();
+    
     // Refresh display for new mode
     updateFormFields();
     updateDisplay();
+}
+
+// Update mode title display
+function updateModeTitleDisplay() {
+    const modeData = getModeData();
+    document.getElementById('modeTitleText').textContent = modeData.title;
 }
 
 // Load all data from Firestore (all modes)
@@ -64,6 +76,7 @@ async function loadAllData() {
         
         // Load settings
         if (cloudData.settings) {
+            data[mode].title = cloudData.settings.title || data[mode].title;
             data[mode].dailyAllowance = cloudData.settings.dailyAllowance || data[mode].dailyAllowance;
             data[mode].startDate = cloudData.settings.startDate || new Date().toISOString().split('T')[0];
             data[mode].frozenBalance = cloudData.settings.frozenBalance || 0;
@@ -76,6 +89,7 @@ async function loadAllData() {
     }
     
     // Update display for current mode
+    updateModeTitleDisplay();
     updateFormFields();
     updateDisplay();
 }
@@ -119,6 +133,7 @@ async function saveAllowanceEdit() {
     modeData.dailyAllowance = newAllowance;
     
     const settings = {
+        title: modeData.title,
         dailyAllowance: modeData.dailyAllowance,
         startDate: modeData.startDate,
         frozenBalance: modeData.frozenBalance
@@ -142,6 +157,52 @@ function cancelAllowanceEdit() {
     editBtn.style.display = 'block';
     saveBtn.style.display = 'none';
     cancelBtn.style.display = 'none';
+}
+
+// ==================================
+// MODE TITLE EDITING
+// ==================================
+
+function toggleModeTitleEdit() {
+    const modeData = getModeData();
+    const displaySection = document.getElementById('modeTitleDisplay');
+    const editSection = document.getElementById('modeTitleEditSection');
+    const input = document.getElementById('modeTitleInput');
+    
+    displaySection.style.display = 'none';
+    editSection.style.display = 'block';
+    input.value = modeData.title;
+    input.focus();
+    input.select();
+}
+
+async function saveModeTitleEdit() {
+    const modeData = getModeData();
+    const newTitle = document.getElementById('modeTitleInput').value.trim();
+    
+    if (!newTitle) {
+        alert('Please enter a category name');
+        return;
+    }
+    
+    modeData.title = newTitle;
+    
+    const settings = {
+        title: modeData.title,
+        dailyAllowance: modeData.dailyAllowance,
+        startDate: modeData.startDate,
+        frozenBalance: modeData.frozenBalance
+    };
+    
+    await saveModeSettingsToFirestore(currentMode, settings);
+    
+    updateModeTitleDisplay();
+    cancelModeTitleEdit();
+}
+
+function cancelModeTitleEdit() {
+    document.getElementById('modeTitleDisplay').style.display = 'flex';
+    document.getElementById('modeTitleEditSection').style.display = 'none';
 }
 
 // ==================================
@@ -173,6 +234,7 @@ async function saveBalanceEdit() {
     modeData.frozenBalance = newBalance + spent - dailyTotal;
     
     const settings = {
+        title: modeData.title,
         dailyAllowance: modeData.dailyAllowance,
         startDate: modeData.startDate,
         frozenBalance: modeData.frozenBalance
