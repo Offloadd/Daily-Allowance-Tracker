@@ -30,6 +30,33 @@ let data = {
         spending: [],
         proposed: [],
         wishlist: []
+    },
+    mode4: {
+        title: 'Blank',
+        dailyAllowance: 10,
+        startDate: new Date().toISOString().split('T')[0],
+        frozenBalance: 0,
+        spending: [],
+        proposed: [],
+        wishlist: []
+    },
+    mode5: {
+        title: 'Blank',
+        dailyAllowance: 10,
+        startDate: new Date().toISOString().split('T')[0],
+        frozenBalance: 0,
+        spending: [],
+        proposed: [],
+        wishlist: []
+    },
+    mode6: {
+        title: 'Blank',
+        dailyAllowance: 10,
+        startDate: new Date().toISOString().split('T')[0],
+        frozenBalance: 0,
+        spending: [],
+        proposed: [],
+        wishlist: []
     }
 };
 
@@ -73,12 +100,15 @@ function updateModeButtonLabels() {
     document.getElementById('modeFoodLabel').textContent = data.food.title;
     document.getElementById('modeVehicleLabel').textContent = data.vehicle.title;
     document.getElementById('modeHomeLabel').textContent = data.home.title;
+    document.getElementById('modeMode4Label').textContent = data.mode4.title;
+    document.getElementById('modeMode5Label').textContent = data.mode5.title;
+    document.getElementById('modeMode6Label').textContent = data.mode6.title;
 }
 
 // Load all data from Firestore (all modes)
 async function loadAllData() {
     // Load each mode's data
-    for (const mode of ['food', 'vehicle', 'home']) {
+    for (const mode of ['food', 'vehicle', 'home', 'mode4', 'mode5', 'mode6']) {
         const cloudData = await loadModeDataFromFirestore(mode);
         
         // Load settings
