@@ -509,6 +509,30 @@
             </div>
         </div>
         
+        <!-- Transfer Balance -->
+        <div style="background: #f9fafb; padding: 20px; border-radius: 15px; margin-bottom: 30px;">
+            <h2 style="margin-bottom: 15px;">💸 Transfer Balance</h2>
+            <div class="input-group">
+                <label style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                    <span style="white-space: nowrap;">Transfer to:</span>
+                    <select id="transferToMode" style="flex: 1; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1em;">
+                        <option value="">Select mode...</option>
+                        <option value="food">Food</option>
+                        <option value="vehicle">Vehicle</option>
+                        <option value="home">Home</option>
+                        <option value="mode4">Blank</option>
+                        <option value="mode5">Blank</option>
+                        <option value="mode6">Blank</option>
+                    </select>
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px;">
+                    <span style="white-space: nowrap;">Amount: $</span>
+                    <input type="number" id="transferAmount" placeholder="0.00" step="0.01" min="0" style="width: 100px;">
+                </label>
+                <button onclick="executeTransfer()" style="background: #f59e0b;">Transfer</button>
+            </div>
+        </div>
+        
         <!-- Proposed Purchases -->
         <div class="proposed-section">
             <h2>🛒 Proposed Purchases</h2>
