@@ -72,6 +72,42 @@
             background: #dc2626;
         }
         
+        /* Mode Selector */
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        .mode-btn.inactive {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+        
+        .mode-btn:hover {
+            transform: translateY(-2px);
+        }
+        
         .balance-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -244,7 +280,6 @@
             color: white;
         }
         
-        /* Compact grid layout for proposed items */
         #proposedList {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -382,17 +417,6 @@
             .logout-section {
                 margin-bottom: 15px;
             }
-            
-            #debugStatus {
-                font-size: 0.8em;
-                padding: 10px;
-                overflow-x: auto;
-            }
-            
-            #debugMessages {
-                font-size: 0.85em;
-                word-break: break-word;
-            }
         }
     </style>
 </head>
@@ -417,13 +441,20 @@
             <button class="logout-btn" onclick="signOut()">Logout</button>
         </div>
         
-        <!-- Debug Status Bar -->
-        <div id="debugStatus" style="background: #f3f4f6; border: 2px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 20px; font-size: 0.9em; font-family: monospace;">
-            <div style="font-weight: bold; margin-bottom: 5px; color: #667eea;">🔍 Debug Status:</div>
-            <div id="debugMessages" style="color: #374151;">Initializing...</div>
-        </div>
-        
         <h1>💰 Daily Allowance Tracker</h1>
+        
+        <!-- Mode Selector -->
+        <div class="mode-selector">
+            <button id="modeFood" class="mode-btn active" onclick="switchMode('food')">
+                🍔 Food
+            </button>
+            <button id="modeVehicle" class="mode-btn inactive" onclick="switchMode('vehicle')">
+                🚗 Vehicle
+            </button>
+            <button id="modeHome" class="mode-btn inactive" onclick="switchMode('home')">
+                🏠 Home
+            </button>
+        </div>
         
         <!-- Balance Overview -->
         <div class="balance-section">
@@ -542,8 +573,6 @@
                 document.getElementById('app').style.display = 'block';
                 window.currentUser = user;
                 
-                addDebugMessage('Logged in - User ID: ' + user.uid.substring(0, 8) + '...');
-                
                 // Load data from Firestore
                 await loadAllData();
             } else {
@@ -554,603 +583,9 @@
         });
     </script>
     
-    <!-- Auth functions -->
+    <!-- External JavaScript Files -->
     <script src="auth.js"></script>
-    
-    <!-- Storage functions -->
-    <script src="storage.js"></script>
-    
-    <!-- Firestore functions -->
     <script src="firestore.js"></script>
-    
-    <!-- Main app logic -->
-    <script>
-        // Debug message helper
-        function addDebugMessage(message, isError = false) {
-            const debugDiv = document.getElementById('debugMessages');
-            if (!debugDiv) return;
-            
-            const timestamp = new Date().toLocaleTimeString();
-            const color = isError ? '#ef4444' : '#10b981';
-            const icon = isError ? '✗' : '✓';
-            
-            const msgHtml = `<div style="color: ${color}; margin: 3px 0;">[${timestamp}] ${icon} ${message}</div>`;
-            debugDiv.innerHTML = msgHtml + debugDiv.innerHTML;
-            
-            // Keep only last 10 messages
-            const messages = debugDiv.querySelectorAll('div');
-            if (messages.length > 10) {
-                for (let i = 10; i < messages.length; i++) {
-                    messages[i].remove();
-                }
-            }
-        }
-        
-        // App state
-        let data = {
-            dailyAllowance: 20,
-            startDate: new Date().toISOString().split('T')[0],
-            frozenBalance: 0,
-            spending: [],
-            proposed: [],
-            wishlist: []
-        };
-        
-        // Load all data from Firestore
-        async function loadAllData() {
-            addDebugMessage('Starting to load data from Firestore...');
-            
-            const cloudData = await loadAllDataFromFirestore();
-            
-            // Load settings
-            if (cloudData.settings) {
-                data.dailyAllowance = cloudData.settings.dailyAllowance || 20;
-                data.startDate = cloudData.settings.startDate || new Date().toISOString().split('T')[0];
-                data.frozenBalance = cloudData.settings.frozenBalance || 0;
-                addDebugMessage('Loaded settings from cloud');
-            } else {
-                addDebugMessage('No settings found in cloud, using defaults');
-            }
-            
-            // Load spending, proposed, and wishlist
-            data.spending = cloudData.spending;
-            data.proposed = cloudData.proposed;
-            data.wishlist = cloudData.wishlist || [];
-            
-            addDebugMessage(`Loaded ${data.spending.length} spending entries from cloud`);
-            addDebugMessage(`Loaded ${data.proposed.length} proposed items from cloud`);
-            addDebugMessage(`Loaded ${data.wishlist.length} wishlist items from cloud`);
-            
-            // Update form fields
-            document.getElementById('dailyAllowance').value = data.dailyAllowance;
-            document.getElementById('spendingDate').value = new Date().toISOString().split('T')[0];
-            
-            updateDisplay();
-        }
-        
-        async function toggleAllowanceEdit() {
-            const input = document.getElementById('dailyAllowance');
-            const editBtn = document.getElementById('editAllowanceBtn');
-            const saveBtn = document.getElementById('saveAllowanceBtn');
-            const cancelBtn = document.getElementById('cancelAllowanceBtn');
-            
-            input.disabled = false;
-            input.focus();
-            input.select();
-            editBtn.style.display = 'none';
-            saveBtn.style.display = 'block';
-            cancelBtn.style.display = 'block';
-        }
-        
-        async function saveAllowanceEdit() {
-            const newAllowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
-            
-            // If allowance changed, snapshot the current balance
-            if (newAllowance !== data.dailyAllowance) {
-                const currentBalance = calculateAccumulated() - calculateTotalSpent();
-                data.frozenBalance = currentBalance;
-                data.startDate = new Date().toISOString().split('T')[0]; // Reset to today
-                
-                addDebugMessage(`Rate changed from $${data.dailyAllowance} to $${newAllowance}, balance frozen at $${currentBalance.toFixed(2)}`);
-            }
-            
-            data.dailyAllowance = newAllowance;
-            
-            const settings = {
-                dailyAllowance: data.dailyAllowance,
-                startDate: data.startDate,
-                frozenBalance: data.frozenBalance
-            };
-            
-            await saveSettingsToFirestore(settings);
-            addDebugMessage('Settings saved to cloud ✓');
-            
-            cancelAllowanceEdit();
-            updateDisplay();
-        }
-        
-        function cancelAllowanceEdit() {
-            const input = document.getElementById('dailyAllowance');
-            const editBtn = document.getElementById('editAllowanceBtn');
-            const saveBtn = document.getElementById('saveAllowanceBtn');
-            const cancelBtn = document.getElementById('cancelAllowanceBtn');
-            
-            input.disabled = true;
-            input.value = data.dailyAllowance;
-            editBtn.style.display = 'block';
-            saveBtn.style.display = 'none';
-            cancelBtn.style.display = 'none';
-        }
-        
-        function toggleBalanceEdit() {
-            const editSection = document.getElementById('balanceEditSection');
-            const editBtn = document.getElementById('editBalanceBtn');
-            const currentBalance = calculateAccumulated() - calculateTotalSpent();
-            
-            if (editSection.style.display === 'none') {
-                // Show edit mode
-                document.getElementById('balanceEditInput').value = currentBalance.toFixed(2);
-                editSection.style.display = 'block';
-                editBtn.style.display = 'none';
-            }
-        }
-        
-        async function saveBalanceEdit() {
-            const newBalance = parseFloat(document.getElementById('balanceEditInput').value) || 0;
-            const spent = calculateTotalSpent();
-            
-            // Set frozenBalance to achieve the desired available balance
-            // available = frozen + dailyAccumulation + manualAdj - spent
-            // So: frozen = available + spent - dailyAccumulation - manualAdj
-            const start = new Date(data.startDate);
-            const today = new Date();
-            const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
-            const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
-            
-            data.frozenBalance = newBalance + spent - dailyTotal;
-            
-            const settings = {
-                dailyAllowance: data.dailyAllowance,
-                startDate: data.startDate,
-                frozenBalance: data.frozenBalance
-            };
-            
-            await saveSettingsToFirestore(settings);
-            
-            cancelBalanceEdit();
-            updateDisplay();
-        }
-        
-        function cancelBalanceEdit() {
-            document.getElementById('balanceEditSection').style.display = 'none';
-            document.getElementById('editBalanceBtn').style.display = 'block';
-        }
-        
-        function calculateAccumulated() {
-            const start = new Date(data.startDate);
-            const today = new Date();
-            const daysDiff = Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1;
-            const dailyTotal = daysDiff > 0 ? daysDiff * data.dailyAllowance : 0;
-            const frozen = data.frozenBalance || 0;
-            return frozen + dailyTotal;
-        }
-        
-        function calculateTotalSpent() {
-            return data.spending.reduce((sum, item) => sum + item.amount, 0);
-        }
-        
-        async function addSpending() {
-            const name = document.getElementById('spendingName').value.trim();
-            const amount = parseFloat(document.getElementById('spendingAmount').value);
-            const date = document.getElementById('spendingDate').value;
-            
-            if (!name || !amount || amount <= 0 || !date) {
-                alert('Please fill in all spending fields');
-                return;
-            }
-            
-            const entry = {
-                id: Date.now(),
-                name: name,
-                amount: amount,
-                date: date
-            };
-            
-            addDebugMessage(`Saving spending: $${amount} for "${name}"...`);
-            
-            // Save to Firestore
-            await saveSpendingToFirestore(entry);
-            
-            addDebugMessage('Spending saved to cloud ✓');
-            
-            // Add to local state
-            data.spending.push(entry);
-            
-            // Clear inputs
-            document.getElementById('spendingName').value = '';
-            document.getElementById('spendingAmount').value = '';
-            
-            updateDisplay();
-        }
-        
-        async function deleteSpending(id, firestoreId) {
-            // Delete from Firestore
-            await deleteSpendingFromFirestore(firestoreId);
-            
-            // Remove from local state
-            data.spending = data.spending.filter(item => item.id !== id);
-            
-            updateDisplay();
-        }
-        
-        async function addProposed() {
-            const name = document.getElementById('proposedName').value.trim();
-            const amount = parseFloat(document.getElementById('proposedAmount').value);
-            
-            if (!name || !amount || amount <= 0) {
-                alert('Please fill in all proposed purchase fields');
-                return;
-            }
-            
-            const item = {
-                id: Date.now(),
-                name: name,
-                amount: amount,
-                checked: false
-            };
-            
-            addDebugMessage(`Saving proposed: $${amount} for "${name}"...`);
-            
-            // Save to Firestore
-            await saveProposedToFirestore(item);
-            
-            addDebugMessage('Proposed item saved to cloud ✓');
-            
-            // Add to local state
-            data.proposed.push(item);
-            
-            // Clear inputs
-            document.getElementById('proposedName').value = '';
-            document.getElementById('proposedAmount').value = '';
-            
-            updateDisplay();
-        }
-        
-        async function deleteProposed(id, firestoreId) {
-            // Delete from Firestore
-            await deleteProposedFromFirestore(firestoreId);
-            
-            // Remove from local state
-            data.proposed = data.proposed.filter(item => item.id !== id);
-            
-            updateDisplay();
-        }
-        
-        async function moveToWishlist(id, firestoreId) {
-            // Find item in proposed
-            const item = data.proposed.find(i => i.id === id);
-            if (!item) return;
-            
-            // Delete from proposed in Firestore
-            await deleteProposedFromFirestore(firestoreId);
-            
-            // Remove from proposed local state
-            data.proposed = data.proposed.filter(i => i.id !== id);
-            
-            // Create new wishlist item (new ID and no firestoreId yet)
-            const wishlistItem = {
-                id: Date.now(),
-                name: item.name,
-                amount: item.amount,
-                checked: false
-            };
-            
-            // Add to wishlist in Firestore
-            await saveWishlistToFirestore(wishlistItem);
-            
-            // Add to wishlist local state
-            data.wishlist.push(wishlistItem);
-            
-            addDebugMessage(`Moved "${item.name}" to wish list`);
-            updateDisplay();
-        }
-        
-        async function addWishlist() {
-            const name = document.getElementById('wishlistName').value.trim();
-            const amount = parseFloat(document.getElementById('wishlistAmount').value);
-            
-            if (!name || !amount || amount <= 0) {
-                alert('Please fill in all wishlist fields');
-                return;
-            }
-            
-            const item = {
-                id: Date.now(),
-                name: name,
-                amount: amount,
-                checked: false
-            };
-            
-            addDebugMessage(`Saving wishlist item: $${amount} for "${name}"...`);
-            
-            // Save to Firestore
-            await saveWishlistToFirestore(item);
-            
-            addDebugMessage('Wishlist item saved to cloud ✓');
-            
-            // Add to local state
-            data.wishlist.push(item);
-            
-            // Clear inputs
-            document.getElementById('wishlistName').value = '';
-            document.getElementById('wishlistAmount').value = '';
-            
-            updateDisplay();
-        }
-        
-        async function deleteWishlist(id, firestoreId) {
-            // Delete from Firestore
-            await deleteWishlistFromFirestore(firestoreId);
-            
-            // Remove from local state
-            data.wishlist = data.wishlist.filter(item => item.id !== id);
-            
-            updateDisplay();
-        }
-        
-        async function moveToProposed(id, firestoreId) {
-            // Find item in wishlist
-            const item = data.wishlist.find(i => i.id === id);
-            if (!item) return;
-            
-            // Delete from wishlist in Firestore
-            await deleteWishlistFromFirestore(firestoreId);
-            
-            // Remove from wishlist local state
-            data.wishlist = data.wishlist.filter(i => i.id !== id);
-            
-            // Create new proposed item (new ID and no firestoreId yet)
-            const proposedItem = {
-                id: Date.now(),
-                name: item.name,
-                amount: item.amount,
-                checked: false
-            };
-            
-            // Add to proposed in Firestore
-            await saveProposedToFirestore(proposedItem);
-            
-            // Add to proposed local state
-            data.proposed.push(proposedItem);
-            
-            addDebugMessage(`Moved "${item.name}" to proposed purchases`);
-            updateDisplay();
-        }
-        
-        async function toggleWishlistCheck(id, firestoreId) {
-            const item = data.wishlist.find(i => i.id === id);
-            if (!item) return;
-            
-            item.checked = !item.checked;
-            await updateWishlistInFirestore(firestoreId, item);
-            
-            updateDisplay();
-        }
-        
-        function startEditWishlist(id) {
-            const item = data.wishlist.find(i => i.id === id);
-            if (!item) return;
-            
-            if (!window.editingWishlist) window.editingWishlist = {};
-            window.editingWishlist[id] = {
-                originalAmount: item.amount,
-                editing: true
-            };
-            
-            updateDisplay();
-        }
-        
-        function cancelEditWishlist(id) {
-            if (window.editingWishlist && window.editingWishlist[id]) {
-                delete window.editingWishlist[id];
-            }
-            updateDisplay();
-        }
-        
-        async function saveEditWishlist(id, firestoreId) {
-            const inputElement = document.getElementById(`editWishlistAmount_${id}`);
-            const newAmount = parseFloat(inputElement.value);
-            
-            if (!newAmount || newAmount <= 0) {
-                alert('Please enter a valid amount');
-                return;
-            }
-            
-            const item = data.wishlist.find(i => i.id === id);
-            if (!item) return;
-            
-            item.amount = newAmount;
-            await updateWishlistInFirestore(firestoreId, item);
-            
-            addDebugMessage(`Updated wishlist "${item.name}" to $${newAmount.toFixed(2)}`);
-            
-            if (window.editingWishlist && window.editingWishlist[id]) {
-                delete window.editingWishlist[id];
-            }
-            
-            updateDisplay();
-        }
-        
-        async function toggleProposedCheck(id, firestoreId) {
-            // Find the item in local state
-            const item = data.proposed.find(i => i.id === id);
-            if (!item) return;
-            
-            // Toggle checked state
-            item.checked = !item.checked;
-            
-            // Update in Firestore
-            await updateProposedInFirestore(firestoreId, item);
-            
-            updateDisplay();
-        }
-        
-        function startEditProposed(id) {
-            const item = data.proposed.find(i => i.id === id);
-            if (!item) return;
-            
-            // Set edit mode
-            if (!window.editingProposed) window.editingProposed = {};
-            window.editingProposed[id] = {
-                originalAmount: item.amount,
-                editing: true
-            };
-            
-            updateDisplay();
-        }
-        
-        function cancelEditProposed(id) {
-            if (window.editingProposed && window.editingProposed[id]) {
-                delete window.editingProposed[id];
-            }
-            updateDisplay();
-        }
-        
-        async function saveEditProposed(id, firestoreId) {
-            const inputElement = document.getElementById(`editAmount_${id}`);
-            const newAmount = parseFloat(inputElement.value);
-            
-            if (!newAmount || newAmount <= 0) {
-                alert('Please enter a valid amount');
-                return;
-            }
-            
-            // Find and update the item
-            const item = data.proposed.find(i => i.id === id);
-            if (!item) return;
-            
-            item.amount = newAmount;
-            
-            // Update in Firestore
-            await updateProposedInFirestore(firestoreId, item);
-            
-            addDebugMessage(`Updated "${item.name}" to $${newAmount.toFixed(2)}`);
-            
-            // Clear edit mode
-            if (window.editingProposed && window.editingProposed[id]) {
-                delete window.editingProposed[id];
-            }
-            
-            updateDisplay();
-        }
-        
-        function updateDisplay() {
-            const accumulated = calculateAccumulated();
-            const spent = calculateTotalSpent();
-            const available = accumulated - spent;
-            
-            // Update balance display
-            document.getElementById('totalAccumulated').textContent = `$${accumulated.toFixed(2)}`;
-            document.getElementById('totalSpent').textContent = `$${spent.toFixed(2)}`;
-            document.getElementById('availableBalance').textContent = `$${available.toFixed(2)}`;
-            document.getElementById('availableBalance').className = available >= 0 ? 'balance-amount positive' : 'balance-amount negative';
-            
-            // Update spending list
-            const spendingList = document.getElementById('spendingList');
-            spendingList.innerHTML = data.spending
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .map(item => `
-                    <li class="item">
-                        <div class="item-details">
-                            <div class="item-name">${item.name}</div>
-                            <div class="item-date">${new Date(item.date).toLocaleDateString()}</div>
-                        </div>
-                        <span class="item-amount">$${item.amount.toFixed(2)}</span>
-                        <button class="delete-btn" onclick="deleteSpending(${item.id}, '${item.firestoreId || ''}')">Delete</button>
-                    </li>
-                `).join('');
-            
-            // Update proposed list with affordability
-            const proposedList = document.getElementById('proposedList');
-            let runningBalance = available;
-            const totalProposed = data.proposed.reduce((sum, item) => sum + item.amount, 0);
-            
-            proposedList.innerHTML = data.proposed.map(item => {
-                const canAfford = runningBalance >= item.amount;
-                if (canAfford) runningBalance -= item.amount;
-                const checked = item.checked || false;
-                const strikethrough = checked ? 'text-decoration: line-through; opacity: 0.6;' : '';
-                const isEditing = window.editingProposed && window.editingProposed[item.id];
-                
-                return `
-                    <li class="item proposed-item ${canAfford ? 'can-afford' : 'cannot-afford'}" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
-                        <button onclick="toggleProposedCheck(${item.id}, '${item.firestoreId || ''}')" style="background: ${checked ? '#667eea' : 'white'}; border: 2px solid #667eea; color: ${checked ? 'white' : '#667eea'}; padding: 8px; margin: 0; font-size: 1.2em; cursor: pointer; border-radius: 5px; width: 36px; height: 36px; flex-shrink: 0; font-weight: bold; display: flex; align-items: center; justify-content: center;">
-                            ${checked ? '✕' : '○'}
-                        </button>
-                        <div class="item-details" style="${strikethrough} flex: 1; min-width: 0;">
-                            <div class="item-name" style="word-break: break-word;">${item.name}</div>
-                            <span class="afford-status ${canAfford ? 'afford-yes' : 'afford-no'}">
-                                ${canAfford ? '✓ Can Afford' : '✗ Cannot Afford'}
-                            </span>
-                        </div>
-                        ${isEditing ? `
-                            <div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center; width: 100%;">
-                                <input type="number" id="editAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="flex: 1; min-width: 100px; padding: 8px; border: 2px solid #667eea; border-radius: 5px; font-size: 1em;">
-                                <button onclick="saveEditProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Save</button>
-                                <button onclick="cancelEditProposed(${item.id})" style="background: #6b7280; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Cancel</button>
-                                <button onclick="moveToWishlist(${item.id}, '${item.firestoreId || ''}')" style="background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">→ Wish</button>
-                                <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
-                            </div>
-                        ` : `
-                            <span class="item-amount" style="${strikethrough} flex-shrink: 0; margin: 0;">$${item.amount.toFixed(2)}</span>
-                            <button onclick="startEditProposed(${item.id})" style="background: #667eea; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">Edit</button>
-                            <button onclick="moveToWishlist(${item.id}, '${item.firestoreId || ''}')" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">→ Wish</button>
-                            <button class="delete-btn" onclick="deleteProposed(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
-                        `}
-                    </li>
-                `;
-            }).join('');
-            
-            // Update wishlist
-            const wishlistList = document.getElementById('wishlistList');
-            wishlistList.innerHTML = data.wishlist.map(item => {
-                const checked = item.checked || false;
-                const strikethrough = checked ? 'text-decoration: line-through; opacity: 0.6;' : '';
-                const isEditing = window.editingWishlist && window.editingWishlist[item.id];
-                
-                return `
-                    <li class="item" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: #fef3c7;">
-                        <button onclick="toggleWishlistCheck(${item.id}, '${item.firestoreId || ''}')" style="background: ${checked ? '#f59e0b' : 'white'}; border: 2px solid #f59e0b; color: ${checked ? 'white' : '#f59e0b'}; padding: 8px; margin: 0; font-size: 1.2em; cursor: pointer; border-radius: 5px; width: 36px; height: 36px; flex-shrink: 0; font-weight: bold; display: flex; align-items: center; justify-content: center;">
-                            ${checked ? '✕' : '○'}
-                        </button>
-                        <div class="item-details" style="${strikethrough} flex: 1; min-width: 0;">
-                            <div class="item-name" style="word-break: break-word;">${item.name}</div>
-                        </div>
-                        ${isEditing ? `
-                            <div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center; width: 100%;">
-                                <input type="number" id="editWishlistAmount_${item.id}" value="${item.amount}" step="0.01" min="0" style="flex: 1; min-width: 100px; padding: 8px; border: 2px solid #f59e0b; border-radius: 5px; font-size: 1em;">
-                                <button onclick="saveEditWishlist(${item.id}, '${item.firestoreId || ''}')" style="background: #4ade80; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Save</button>
-                                <button onclick="cancelEditWishlist(${item.id})" style="background: #6b7280; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">Cancel</button>
-                                <button onclick="moveToProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #667eea; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9em; cursor: pointer; flex-shrink: 0;">→ Proposed</button>
-                                <button class="delete-btn" onclick="deleteWishlist(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
-                            </div>
-                        ` : `
-                            <span class="item-amount" style="${strikethrough} flex-shrink: 0; margin: 0;">$${item.amount.toFixed(2)}</span>
-                            <button onclick="startEditWishlist(${item.id})" style="background: #f59e0b; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">Edit</button>
-                            <button onclick="moveToProposed(${item.id}, '${item.firestoreId || ''}')" style="background: #667eea; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 0.85em; cursor: pointer; flex-shrink: 0;">→ Proposed</button>
-                            <button class="delete-btn" onclick="deleteWishlist(${item.id}, '${item.firestoreId || ''}')" style="flex-shrink: 0;">Delete</button>
-                        `}
-                    </li>
-                `;
-            }).join('');
-            
-            // Update proposed totals
-            const remainingAfter = available - totalProposed;
-            document.getElementById('totalProposed').textContent = `$${totalProposed.toFixed(2)}`;
-            document.getElementById('proposedAvailable').textContent = `$${available.toFixed(2)}`;
-            document.getElementById('remainingAfter').textContent = `$${remainingAfter.toFixed(2)}`;
-            document.getElementById('remainingAfter').className = remainingAfter >= 0 ? 'proposed-totals-amount totals-positive' : 'proposed-totals-amount totals-negative';
-        }
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
