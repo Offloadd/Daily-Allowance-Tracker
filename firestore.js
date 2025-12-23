@@ -1,52 +1,67 @@
-// firestore.js - Firestore operations for Money Tracker
+// firestore.js - Firestore operations for Money Tracker with Mode Support
+
+// ============================================
+// MODE DATA LOADING
+// ============================================
+
+async function loadModeDataFromFirestore(mode) {
+    const spending = await loadModeSpendingFromFirestore(mode);
+    const proposed = await loadModeProposedFromFirestore(mode);
+    const wishlist = await loadModeWishlistFromFirestore(mode);
+    const settings = await loadModeSettingsFromFirestore(mode);
+    
+    return {
+        spending: spending || [],
+        proposed: proposed || [],
+        wishlist: wishlist || [],
+        settings: settings || null
+    };
+}
 
 // ============================================
 // SPENDING ENTRIES
 // ============================================
 
-async function saveSpendingToFirestore(entry) {
+async function saveModeSpendingToFirestore(mode, entry) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized, skipping cloud save');
-        if (window.addDebugMessage) window.addDebugMessage('ERROR: Not logged in or Firestore not ready', true);
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyEntries').add(entry);
-        console.log('Spending entry saved to Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Spending`).add(entry);
+        console.log(`${mode} spending entry saved to Firestore`);
     } catch (error) {
-        console.error('Error saving spending to Firestore:', error);
-        if (window.addDebugMessage) window.addDebugMessage('ERROR saving: ' + error.message, true);
+        console.error(`Error saving ${mode} spending to Firestore:`, error);
     }
 }
 
-async function deleteSpendingFromFirestore(entryId) {
+async function deleteModeSpendingFromFirestore(mode, entryId) {
     const user = window.currentUser;
     if (!user || !window.db || !entryId) {
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyEntries').doc(entryId).delete();
-        console.log('Spending entry deleted from Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Spending`).doc(entryId).delete();
+        console.log(`${mode} spending entry deleted from Firestore`);
     } catch (error) {
-        console.error('Error deleting spending from Firestore:', error);
+        console.error(`Error deleting ${mode} spending from Firestore:`, error);
     }
 }
 
-async function loadSpendingFromFirestore() {
+async function loadModeSpendingFromFirestore(mode) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized');
-        if (window.addDebugMessage) window.addDebugMessage('ERROR: Cannot load - not logged in', true);
         return [];
     }
     
     try {
         const snapshot = await db.collection('users')
             .doc(user.uid)
-            .collection('moneyEntries')
+            .collection(`${mode}Spending`)
             .orderBy('date', 'desc')
             .get();
         
@@ -55,11 +70,10 @@ async function loadSpendingFromFirestore() {
             entries.push({ firestoreId: doc.id, ...doc.data() });
         });
         
-        console.log('Loaded', entries.length, 'spending entries from Firestore');
+        console.log(`Loaded ${entries.length} ${mode} spending entries from Firestore`);
         return entries;
     } catch (error) {
-        console.error('Error loading spending from Firestore:', error);
-        if (window.addDebugMessage) window.addDebugMessage('ERROR loading spending: ' + error.message, true);
+        console.error(`Error loading ${mode} spending from Firestore:`, error);
         return [];
     }
 }
@@ -68,55 +82,36 @@ async function loadSpendingFromFirestore() {
 // PROPOSED PURCHASES
 // ============================================
 
-async function saveProposedToFirestore(item) {
+async function saveModeProposedToFirestore(mode, item) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized, skipping cloud save');
-        if (window.addDebugMessage) window.addDebugMessage('ERROR: Not logged in or Firestore not ready', true);
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyProposed').add(item);
-        console.log('Proposed item saved to Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Proposed`).add(item);
+        console.log(`${mode} proposed item saved to Firestore`);
     } catch (error) {
-        console.error('Error saving proposed to Firestore:', error);
-        if (window.addDebugMessage) window.addDebugMessage('ERROR saving proposed: ' + error.message, true);
+        console.error(`Error saving ${mode} proposed to Firestore:`, error);
     }
 }
 
-async function deleteProposedFromFirestore(itemId) {
+async function deleteModeProposedFromFirestore(mode, itemId) {
     const user = window.currentUser;
     if (!user || !window.db || !itemId) {
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyProposed').doc(itemId).delete();
-        console.log('Proposed item deleted from Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Proposed`).doc(itemId).delete();
+        console.log(`${mode} proposed item deleted from Firestore`);
     } catch (error) {
-        console.error('Error deleting proposed from Firestore:', error);
+        console.error(`Error deleting ${mode} proposed from Firestore:`, error);
     }
 }
 
-async function updateProposedInFirestore(itemId, item) {
-    const user = window.currentUser;
-    if (!user || !window.db || !itemId) {
-        return;
-    }
-    
-    try {
-        await db.collection('users').doc(user.uid).collection('moneyProposed').doc(itemId).update({
-            checked: item.checked,
-            amount: item.amount
-        });
-        console.log('Proposed item updated in Firestore');
-    } catch (error) {
-        console.error('Error updating proposed in Firestore:', error);
-    }
-}
-
-async function loadProposedFromFirestore() {
+async function loadModeProposedFromFirestore(mode) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized');
@@ -126,7 +121,7 @@ async function loadProposedFromFirestore() {
     try {
         const snapshot = await db.collection('users')
             .doc(user.uid)
-            .collection('moneyProposed')
+            .collection(`${mode}Proposed`)
             .get();
         
         const items = [];
@@ -134,11 +129,28 @@ async function loadProposedFromFirestore() {
             items.push({ firestoreId: doc.id, ...doc.data() });
         });
         
-        console.log('Loaded', items.length, 'proposed items from Firestore');
+        console.log(`Loaded ${items.length} ${mode} proposed items from Firestore`);
         return items;
     } catch (error) {
-        console.error('Error loading proposed from Firestore:', error);
+        console.error(`Error loading ${mode} proposed from Firestore:`, error);
         return [];
+    }
+}
+
+async function updateModeProposedInFirestore(mode, itemId, item) {
+    const user = window.currentUser;
+    if (!user || !window.db || !itemId) {
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(user.uid).collection(`${mode}Proposed`).doc(itemId).update({
+            checked: item.checked,
+            amount: item.amount
+        });
+        console.log(`${mode} proposed item updated in Firestore`);
+    } catch (error) {
+        console.error(`Error updating ${mode} proposed in Firestore:`, error);
     }
 }
 
@@ -146,49 +158,46 @@ async function loadProposedFromFirestore() {
 // WISHLIST
 // ============================================
 
-async function saveWishlistToFirestore(item) {
+async function saveModeWishlistToFirestore(mode, item) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized, skipping cloud save');
-        if (window.addDebugMessage) window.addDebugMessage('ERROR: Not logged in or Firestore not ready', true);
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyWishList').add(item);
-        console.log('Wishlist item saved to Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Wishlist`).add(item);
+        console.log(`${mode} wishlist item saved to Firestore`);
     } catch (error) {
-        console.error('Error saving wishlist to Firestore:', error);
-        if (window.addDebugMessage) window.addDebugMessage('ERROR saving wishlist: ' + error.message, true);
+        console.error(`Error saving ${mode} wishlist to Firestore:`, error);
     }
 }
 
-async function deleteWishlistFromFirestore(itemId) {
+async function deleteModeWishlistFromFirestore(mode, itemId) {
     const user = window.currentUser;
     if (!user || !window.db || !itemId) {
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyWishList').doc(itemId).delete();
-        console.log('Wishlist item deleted from Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Wishlist`).doc(itemId).delete();
+        console.log(`${mode} wishlist item deleted from Firestore`);
     } catch (error) {
-        console.error('Error deleting wishlist from Firestore:', error);
+        console.error(`Error deleting ${mode} wishlist from Firestore:`, error);
     }
 }
 
-async function loadWishlistFromFirestore() {
+async function loadModeWishlistFromFirestore(mode) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized');
-        if (window.addDebugMessage) window.addDebugMessage('ERROR: Cannot load - not logged in', true);
         return [];
     }
     
     try {
         const snapshot = await db.collection('users')
             .doc(user.uid)
-            .collection('moneyWishList')
+            .collection(`${mode}Wishlist`)
             .get();
         
         const items = [];
@@ -196,29 +205,28 @@ async function loadWishlistFromFirestore() {
             items.push({ firestoreId: doc.id, ...doc.data() });
         });
         
-        console.log('Loaded', items.length, 'wishlist items from Firestore');
+        console.log(`Loaded ${items.length} ${mode} wishlist items from Firestore`);
         return items;
     } catch (error) {
-        console.error('Error loading wishlist from Firestore:', error);
-        if (window.addDebugMessage) window.addDebugMessage('ERROR loading wishlist: ' + error.message, true);
+        console.error(`Error loading ${mode} wishlist from Firestore:`, error);
         return [];
     }
 }
 
-async function updateWishlistInFirestore(itemId, item) {
+async function updateModeWishlistInFirestore(mode, itemId, item) {
     const user = window.currentUser;
     if (!user || !window.db || !itemId) {
         return;
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneyWishList').doc(itemId).update({
+        await db.collection('users').doc(user.uid).collection(`${mode}Wishlist`).doc(itemId).update({
             checked: item.checked,
             amount: item.amount
         });
-        console.log('Wishlist item updated in Firestore');
+        console.log(`${mode} wishlist item updated in Firestore`);
     } catch (error) {
-        console.error('Error updating wishlist in Firestore:', error);
+        console.error(`Error updating ${mode} wishlist in Firestore:`, error);
     }
 }
 
@@ -226,7 +234,7 @@ async function updateWishlistInFirestore(itemId, item) {
 // SETTINGS
 // ============================================
 
-async function saveSettingsToFirestore(settings) {
+async function saveModeSettingsToFirestore(mode, settings) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized, skipping cloud save');
@@ -234,14 +242,14 @@ async function saveSettingsToFirestore(settings) {
     }
     
     try {
-        await db.collection('users').doc(user.uid).collection('moneySettings').doc('main').set(settings);
-        console.log('Settings saved to Firestore');
+        await db.collection('users').doc(user.uid).collection(`${mode}Settings`).doc('main').set(settings);
+        console.log(`${mode} settings saved to Firestore`);
     } catch (error) {
-        console.error('Error saving settings to Firestore:', error);
+        console.error(`Error saving ${mode} settings to Firestore:`, error);
     }
 }
 
-async function loadSettingsFromFirestore() {
+async function loadModeSettingsFromFirestore(mode) {
     const user = window.currentUser;
     if (!user || !window.db) {
         console.log('No user or Firestore not initialized');
@@ -251,37 +259,19 @@ async function loadSettingsFromFirestore() {
     try {
         const doc = await db.collection('users')
             .doc(user.uid)
-            .collection('moneySettings')
+            .collection(`${mode}Settings`)
             .doc('main')
             .get();
         
         if (doc.exists) {
-            console.log('Loaded settings from Firestore');
+            console.log(`Loaded ${mode} settings from Firestore`);
             return doc.data();
         } else {
-            console.log('No settings found in Firestore');
+            console.log(`No ${mode} settings found in Firestore`);
             return null;
         }
     } catch (error) {
-        console.error('Error loading settings from Firestore:', error);
+        console.error(`Error loading ${mode} settings from Firestore:`, error);
         return null;
     }
-}
-
-// ============================================
-// INITIAL LOAD
-// ============================================
-
-async function loadAllDataFromFirestore() {
-    const spending = await loadSpendingFromFirestore();
-    const proposed = await loadProposedFromFirestore();
-    const wishlist = await loadWishlistFromFirestore();
-    const settings = await loadSettingsFromFirestore();
-    
-    return {
-        spending: spending || [],
-        proposed: proposed || [],
-        wishlist: wishlist || [],
-        settings: settings || null
-    };
 }
