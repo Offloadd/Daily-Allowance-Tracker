@@ -68,6 +68,13 @@ function updateModeTitleDisplay() {
     document.getElementById('modeTitleText').textContent = modeData.title;
 }
 
+// Update all mode button labels
+function updateModeButtonLabels() {
+    document.getElementById('modeFoodLabel').textContent = data.food.title;
+    document.getElementById('modeVehicleLabel').textContent = data.vehicle.title;
+    document.getElementById('modeHomeLabel').textContent = data.home.title;
+}
+
 // Load all data from Firestore (all modes)
 async function loadAllData() {
     // Load each mode's data
@@ -90,6 +97,7 @@ async function loadAllData() {
     
     // Update display for current mode
     updateModeTitleDisplay();
+    updateModeButtonLabels();
     updateFormFields();
     updateDisplay();
 }
@@ -197,6 +205,7 @@ async function saveModeTitleEdit() {
     await saveModeSettingsToFirestore(currentMode, settings);
     
     updateModeTitleDisplay();
+    updateModeButtonLabels();
     cancelModeTitleEdit();
 }
 
