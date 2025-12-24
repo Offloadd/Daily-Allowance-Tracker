@@ -882,3 +882,60 @@ document.getElementById('remainingAfter').className = remainingAfter >= 0 ? 'pro
 ```
 
 }
+
+// ==================================
+// DATA MIGRATION
+// ==================================
+
+async function migrateOldData() {
+if (!confirm(‘This will copy data from old single-mode collections (moneyEntries, moneyProposed, moneyWishList, moneySettings) into the Food mode. Continue?’)) {
+return;
+}
+
+```
+const user = window.currentUser;
+if (!user || !window.db) {
+    alert('Not logged in');
+    return;
+}
+
+try {
+    // Migrate spending entries
+    const spendingSnapshot = await db.collection('users').doc(user.uid).collection('moneyEntries').get();
+    let spendingCount = 0;
+    for (const doc of spendingSnapshot.docs) {
+        await db.collection('users').doc(user.uid).collection('foodSpending').doc(doc.id).set(doc.data());
+        spendingCount++;
+    }
+    
+    // Migrate proposed
+    const proposedSnapshot = await db.collection('users').doc(user.uid).collection('moneyProposed').get();
+    let proposedCount = 0;
+    for (const doc of proposedSnapshot.docs) {
+        await db.collection('users').doc(user.uid).collection('foodProposed').doc(doc.id).set(doc.data());
+        proposedCount++;
+    }
+    
+    // Migrate wishlist
+    const wishlistSnapshot = await db.collection('users').doc(user.uid).collection('moneyWishList').get();
+    let wishlistCount = 0;
+    for (const doc of wishlistSnapshot.docs) {
+        await db.collection('users').doc(user.uid).collection('foodWishlist').doc(doc.id).set(doc.data());
+        wishlistCount++;
+    }
+    
+    // Migrate settings
+    const settingsDoc = await db.collection('users').doc(user.uid).collection('moneySettings').doc('main').get();
+    if (settingsDoc.exists) {
+        await db.collection('users').doc(user.uid).collection('foodSettings').doc('main').set(settingsDoc.data());
+    }
+    
+    alert(`Migration complete!\nSpending: ${spendingCount}\nProposed: ${proposedCount}\nWishlist: ${wishlistCount}\n\nRefresh the page to see your data.`);
+    
+} catch (error) {
+    console.error('Migration error:', error);
+    alert('Migration failed: ' + error.message);
+}
+```
+
+}
